@@ -1,0 +1,33 @@
+[theme]
+primaryColor = "#ffcb05"        # 메인 버튼, 강조 - 옐로우
+backgroundColor = "#f8f9fd"     # 배경 - 연한 블루
+secondaryBackgroundColor = "#e8ecf7"  # 사이드바, 카드 배경 - 연한 블루
+textColor = "#191970"           # 텍스트 - 진한 블루
+font = "sans serif"             # Streamlit 기본값 (CSS에서 Paybooc으로 오버라이드)
+
+[server]
+port = 8501
+enableCORS = false
+enableXsrfProtection = true
+```
+
+5. **"Commit new file"** 클릭
+
+### 2단계: streamlit_app.py 업데이트
+
+1. GitHub에서 `streamlit_app.py` 클릭
+2. 연필(✏️) 아이콘 클릭
+3. 다운로드한 새 내용으로 전체 교체
+4. **"Commit changes"** 클릭
+
+### ✅ 완료!
+
+이렇게 하면:
+```
+AutoPost/
+├── .gitignore
+├── .streamlit/
+│   └── config.toml       ← 새로 생성
+├── README.md
+├── requirements.txt
+└── streamlit_app.py      ← 업데이트
