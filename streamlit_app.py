@@ -11,9 +11,170 @@ st.set_page_config(
     layout="wide"
 )
 
+# 커스텀 CSS
+st.markdown("""
+<style>
+    /* 페이퍼로지 폰트 불러오기 */
+    @import url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.1/Paybooc.woff') format('woff');
+    
+    @font-face {
+        font-family: 'Paybooc';
+        src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.1/Paybooc.woff') format('woff');
+        font-weight: normal;
+        font-style: normal;
+    }
+    
+    /* 전체 폰트 적용 */
+    * {
+        font-family: 'Paybooc', 'Apple SD Gothic Neo', sans-serif !important;
+    }
+    
+    /* 메인 타이틀 스타일 */
+    h1 {
+        color: #191970 !important;
+        font-weight: 700 !important;
+        font-family: 'Paybooc' !important;
+    }
+    
+    /* 서브 타이틀 */
+    h2, h3 {
+        color: #191970 !important;
+    }
+    
+    /* 버튼 호버 효과 */
+    .stButton > button {
+        border: 2px solid #ffcb05 !important;
+        font-weight: 600 !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    .stButton > button:hover {
+        background-color: #ffcb05 !important;
+        color: #191970 !important;
+        border-color: #191970 !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 12px rgba(255, 203, 5, 0.3) !important;
+    }
+    
+    /* Primary 버튼 */
+    .stButton > button[kind="primary"] {
+        background-color: #ffcb05 !important;
+        color: #191970 !important;
+        border: none !important;
+    }
+    
+    /* Secondary 버튼 */
+    .stButton > button[kind="secondary"] {
+        background-color: #191970 !important;
+        color: #ffffff !important;
+        border: 2px solid #ffcb05 !important;
+    }
+    
+    .stButton > button[kind="secondary"]:hover {
+        background-color: #ffcb05 !important;
+        color: #191970 !important;
+    }
+    
+    /* 입력 필드 포커스 */
+    .stTextInput > div > div > input:focus,
+    .stTextArea > div > div > textarea:focus {
+        border-color: #ffcb05 !important;
+        box-shadow: 0 0 0 1px #ffcb05 !important;
+    }
+    
+    /* 사이드바 스타일 */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #e8ecf7 0%, #f8f9fd 100%) !important;
+    }
+    
+    /* 탭 스타일 */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        background-color: #e8ecf7;
+        color: #191970;
+        border-radius: 8px 8px 0 0;
+        padding: 12px 24px;
+        font-weight: 600;
+        border: 2px solid transparent;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background-color: #ffcb05 !important;
+        border-color: #191970 !important;
+    }
+    
+    /* 성공 메시지 */
+    .stSuccess {
+        background-color: #fffbea !important;
+        border-left: 4px solid #ffcb05 !important;
+        color: #191970 !important;
+    }
+    
+    /* 정보 메시지 */
+    .stInfo {
+        background-color: #f0f2ff !important;
+        border-left: 4px solid #191970 !important;
+    }
+    
+    /* 메트릭 카드 */
+    [data-testid="stMetricValue"] {
+        color: #191970 !important;
+        font-weight: 700 !important;
+    }
+    
+    /* 다운로드 버튼 */
+    .stDownloadButton > button {
+        background-color: #191970 !important;
+        color: #ffcb05 !important;
+        border: 2px solid #ffcb05 !important;
+    }
+    
+    .stDownloadButton > button:hover {
+        background-color: #ffcb05 !important;
+        color: #191970 !important;
+    }
+    
+    /* 슬라이더 */
+    .stSlider > div > div > div > div {
+        background-color: #ffcb05 !important;
+    }
+    
+    /* 체크박스 */
+    .stCheckbox > label > div[data-testid="stMarkdownContainer"] > p {
+        color: #191970 !important;
+        font-weight: 500 !important;
+    }
+    
+    /* 라디오 버튼 */
+    .stRadio > label > div[data-testid="stMarkdownContainer"] > p {
+        color: #191970 !important;
+        font-weight: 500 !important;
+    }
+    
+    /* 셀렉트박스 */
+    .stSelectbox > label > div[data-testid="stMarkdownContainer"] > p {
+        color: #191970 !important;
+        font-weight: 600 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # 제목
-st.title("✍️ AutoPost - AI 블로그 자동화 시스템")
-st.caption("Claude API 기반 범용 콘텐츠 생성 + 네이버 자동 포스팅")
+st.markdown("""
+<h1 style='text-align: center; padding: 20px 0;'>
+    ✍️ AutoPost
+    <span style='color: #ffcb05;'>AI 블로그 자동화</span>
+</h1>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<p style='text-align: center; color: #191970; font-size: 16px; margin-bottom: 30px;'>
+    Claude API 기반 범용 콘텐츠 생성 + 네이버 자동 포스팅
+</p>
+""", unsafe_allow_html=True)
 
 # 사이드바 - API 설정
 with st.sidebar:
