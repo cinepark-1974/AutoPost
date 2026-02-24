@@ -11,11 +11,12 @@ Claude API 기반 범용 블로그 콘텐츠 자동 생성 + 네이버 블로그
 - **다양한 스타일**: 정보 전달형, 후기형, 스토리텔링형
 - **실시간 미리보기**: 생성된 글 바로 확인
 - **커스텀 테마**: 블루-옐로우 컬러 + 페이퍼로지 폰트
+- **무료 이미지 자동 검색**: Pexels API 연동, 출처 자동 표기
 
 ### 🚧 개발 예정
 - 네이버 블로그 자동 발행
 - 예약 발행 시스템
-- 이미지 자동 생성 (DALL-E 연동)
+- AI 이미지 생성 (DALL-E 연동) - 선택사항
 - 통계 대시보드
 
 ## 🚀 빠른 시작
@@ -97,22 +98,52 @@ AutoPost/
 
 **중요**: API 키는 절대 GitHub에 올리지 마세요!
 
-### Streamlit Secrets 사용 (권장)
+### Streamlit Secrets 사용 (필수 설정!)
 
-Streamlit Cloud에서:
-1. 앱 설정 → Secrets
-2. 다음 형식으로 입력:
+**한 번만 설정하면 PC/모바일 모두에서 자동으로 작동합니다.**
 
-```toml
-CLAUDE_API_KEY = "your-api-key-here"
-NAVER_CLIENT_ID = "your-client-id"
-NAVER_CLIENT_SECRET = "your-client-secret"
+#### 설정 방법:
+
+1. **Streamlit Cloud 접속**
+   - https://share.streamlit.io
+   - 로그인
+
+2. **앱 선택**
+   - AutoPost 앱 클릭
+
+3. **Settings 열기**
+   - 우측 상단 ⚙️ (Settings) 클릭
+   - **Secrets** 탭 선택
+
+4. **API 키 입력**
+   ```toml
+   CLAUDE_API_KEY = "sk-ant-api03-여기에실제키입력"
+   NAVER_CLIENT_ID = "여기에실제ID입력"
+   NAVER_CLIENT_SECRET = "여기에실제시크릿입력"
+   NAVER_BLOG_ID = "cinepark"
+   ```
+
+5. **Save 클릭**
+
+#### 설정 완료 후:
+
+✅ **PC에서**: 사이드바에 "✅ API Key 자동 로드 완료" 표시
+✅ **모바일에서**: 동일하게 자동 로드, 입력 불필요
+✅ **안전**: GitHub에 노출 안 됨, 암호화 저장
+
+### 로컬 개발용 (선택사항)
+
+로컬에서 테스트할 때:
+
+```bash
+# .streamlit 폴더 생성
+mkdir .streamlit
+
+# .streamlit/secrets.toml 생성 후 API 키 입력
+echo 'CLAUDE_API_KEY = "your-key"' > .streamlit/secrets.toml
 ```
 
-코드에서 사용:
-```python
-api_key = st.secrets["CLAUDE_API_KEY"]
-```
+**주의**: `.gitignore`에 의해 자동으로 Git에서 제외됩니다.
 
 ## 🎨 커스터마이징
 
