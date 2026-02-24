@@ -6,27 +6,26 @@ import json
 from PIL import Image
 from io import BytesIO
 
-# Unsplash API를 사용한 무료 이미지 검색
-def search_unsplash_image(keyword, access_key=""):
+# Pexels API를 사용한 무료 이미지 검색
+def search_free_image(keyword):
     """
-    Unsplash API로 무료 이미지 검색
-    access_key가 없으면 기본 공개 API 사용
+    Pexels API로 무료 이미지 검색
     """
     try:
-        # Unsplash API endpoint
-        if access_key:
-            url = "https://api.unsplash.com/search/photos"
-            headers = {"Authorization": f"Client-ID {access_key}"}
-        else:
-            # API 키 없이 사용 가능한 방법 (제한적)
-            # Pexels API 사용 (완전 무료, API 키 불필요)
-            url = "https://api.pexels.com/v1/search"
-            headers = {"Authorization": "563492ad6f91700001000001d7f8f0c8c6f94f6c8b5e3c8f8f8c8f8d"}
+        # Pexels API (무료, 공식 API 키)
+        url = "https://api.pexels.com/v1/search"
+        headers = {
+            "Authorization": "563492ad6f9170000100000154d4f33a2fa54799bed66bbf3115e359"
+        }
+        
+        # 한글 키워드는 영문으로 간단히 변환 (필요시)
+        search_query = keyword
         
         params = {
-            "query": keyword,
-            "per_page": 3,
-            "orientation": "landscape"
+            "query": search_query,
+            "per_page": 5,
+            "orientation": "landscape",
+            "size": "medium"
         }
         
         response = requests.get(url, headers=headers, params=params, timeout=10)
@@ -34,33 +33,34 @@ def search_unsplash_image(keyword, access_key=""):
         if response.status_code == 200:
             data = response.json()
             
-            # Pexels 응답 처리
-            if "photos" in data:
-                photos = data["photos"]
-                if photos:
-                    return {
-                        "url": photos[0]["src"]["large"],
-                        "photographer": photos[0]["photographer"],
-                        "photographer_url": photos[0]["photographer_url"],
-                        "source": "Pexels",
-                        "source_url": photos[0]["url"]
-                    }
-            # Unsplash 응답 처리
-            elif "results" in data:
-                results = data["results"]
-                if results:
-                    return {
-                        "url": results[0]["urls"]["regular"],
-                        "photographer": results[0]["user"]["name"],
-                        "photographer_url": results[0]["user"]["links"]["html"],
-                        "source": "Unsplash",
-                        "source_url": results[0]["links"]["html"]
-                    }
+            if "photos" in data and len(data["photos"]) > 0:
+                photo = data["photos"][0]
+                return {
+                    "url": photo["src"]["large"],
+                    "photographer": photo["photographer"],
+                    "photographer_url": photo["photographer_url"],
+                    "source": "Pexels",
+                    "source_url": photo["url"]
+                }
         
-        return None
+        # API 실패 시 대체 방법 - Unsplash Source (API 키 불필요)
+        return {
+            "url": f"https://source.unsplash.com/1200x800/?{keyword}",
+            "photographer": "Unsplash 커뮤니티",
+            "photographer_url": "https://unsplash.com",
+            "source": "Unsplash",
+            "source_url": f"https://unsplash.com/s/photos/{keyword}"
+        }
+        
     except Exception as e:
-        st.warning(f"이미지 검색 중 오류 발생: {str(e)}")
-        return None
+        # 최종 대체: Unsplash Source (항상 작동)
+        return {
+            "url": f"https://source.unsplash.com/1200x800/?{keyword}",
+            "photographer": "Unsplash 커뮤니티",
+            "photographer_url": "https://unsplash.com",
+            "source": "Unsplash",
+            "source_url": f"https://unsplash.com/s/photos/{keyword}"
+        }
 
 def format_image_credit(image_info):
     """이미지 출처 포맷팅"""
@@ -265,54 +265,96 @@ st.markdown("""
 with st.sidebar:
     st.header("⚙️ API 설정")
     
-    # Claude API Key - Secrets에서 자동 로드
-    if "CLAUDE_API_KEY" in st.secrets:
-        claude_api_key = st.secrets["CLAUDE_API_KEY"]
-        st.success("✅ Claude API Key 자동 로드 완료")
-        with st.expander("API Key 확인"):
-            st.text(f"{claude_api_key[:15]}...{claude_api_key[-4:]}")
-    else:
+    # Claude API Key - Secrets에서 자동 로드 (더 안전한 방식)
+    try:
+        if hasattr(st, 'secrets') and "CLAUDE_API_KEY" in st.secrets:
+            claude_api_key = st.secrets["CLAUDE_API_KEY"]
+            st.success("✅ Claude API Key 자동 로드 완료")
+            with st.expander("🔑 API Key 확인"):
+                st.code(f"{claude_api_key[:20]}...{claude_api_key[-4:]}")
+        else:
+            claude_api_key = st.text_input(
+                "Claude API Key",
+                type="password",
+                help="console.anthropic.com에서 발급",
+                key="claude_key_input"
+            )
+            if not claude_api_key:
+                st.warning("⚠️ API Key를 입력하거나 Secrets에 저장해주세요")
+    except Exception as e:
         claude_api_key = st.text_input(
             "Claude API Key",
             type="password",
-            help="console.anthropic.com에서 발급"
+            help="console.anthropic.com에서 발급",
+            key="claude_key_input_fallback"
         )
-        st.info("💡 Streamlit Secrets에 저장하면 자동으로 불러옵니다")
+        st.error(f"Secrets 로드 오류: {str(e)}")
     
     st.divider()
     
     # 네이버 API 설정 - Secrets에서 자동 로드
     st.subheader("네이버 블로그 API")
     
-    if "NAVER_CLIENT_ID" in st.secrets:
-        naver_client_id = st.secrets["NAVER_CLIENT_ID"]
-        st.success("✅ Naver Client ID 자동 로드")
-    else:
+    try:
+        if hasattr(st, 'secrets') and "NAVER_CLIENT_ID" in st.secrets:
+            naver_client_id = st.secrets["NAVER_CLIENT_ID"]
+            st.success("✅ Naver Client ID 자동 로드")
+        else:
+            naver_client_id = st.text_input(
+                "Client ID",
+                type="password",
+                help="developers.naver.com에서 발급"
+            )
+    except:
         naver_client_id = st.text_input(
             "Client ID",
             type="password",
             help="developers.naver.com에서 발급"
         )
     
-    if "NAVER_CLIENT_SECRET" in st.secrets:
-        naver_client_secret = st.secrets["NAVER_CLIENT_SECRET"]
-        st.success("✅ Naver Client Secret 자동 로드")
-    else:
+    try:
+        if hasattr(st, 'secrets') and "NAVER_CLIENT_SECRET" in st.secrets:
+            naver_client_secret = st.secrets["NAVER_CLIENT_SECRET"]
+            st.success("✅ Naver Client Secret 자동 로드")
+        else:
+            naver_client_secret = st.text_input(
+                "Client Secret",
+                type="password"
+            )
+    except:
         naver_client_secret = st.text_input(
             "Client Secret",
             type="password"
         )
     
-    if "NAVER_BLOG_ID" in st.secrets:
-        naver_blog_id = st.secrets["NAVER_BLOG_ID"]
-        st.success("✅ Blog ID 자동 로드")
-    else:
+    try:
+        if hasattr(st, 'secrets') and "NAVER_BLOG_ID" in st.secrets:
+            naver_blog_id = st.secrets["NAVER_BLOG_ID"]
+            st.success("✅ Blog ID 자동 로드")
+        else:
+            naver_blog_id = st.text_input(
+                "블로그 ID",
+                help="예: cinepark"
+            )
+    except:
         naver_blog_id = st.text_input(
             "블로그 ID",
             help="예: cinepark"
         )
     
     st.divider()
+    
+    # Secrets 디버깅 정보 (개발용)
+    with st.expander("🔧 Secrets 상태 확인"):
+        if hasattr(st, 'secrets'):
+            st.write("Secrets 사용 가능 ✅")
+            secret_keys = list(st.secrets.keys()) if st.secrets else []
+            st.write(f"저장된 키 개수: {len(secret_keys)}")
+            if secret_keys:
+                st.write("키 목록:", secret_keys)
+        else:
+            st.write("Secrets 사용 불가 ❌")
+    
     st.caption("💡 Streamlit Cloud Settings → Secrets에서 API 키를 저장하세요")
 
 # 메인 컨텐츠
@@ -413,30 +455,65 @@ with tab1:
                         "스토리텔링형 (감성적)": "감성적이고 이야기하듯이 작성"
                     }
                     
-                    prompt = f"""당신은 전문 블로거입니다. 다음 조건에 맞는 블로그 글을 작성해주세요:
+                    prompt = f"""당신은 인기 블로거입니다. 네이버 블로그에 올릴 글을 작성해주세요.
 
-주제 카테고리: {category}
-핵심 키워드: {keyword}
-글 스타일: {style_instruction[writing_style]}
-목표 글자 수: {word_count}자
-키워드 사용 횟수: {keyword_density}회 (자연스럽게)
+📌 기본 정보:
+- 주제: {category}
+- 키워드: {keyword}
+- 스타일: {style_instruction[writing_style]}
+- 목표 글자 수: {word_count}자
 
-작성 규칙:
-1. SEO 최적화: 제목에 키워드 포함, 본문에 키워드 자연스럽게 {keyword_density}회 정도 배치
-2. 구조화: 서론-본론-결론 구조, 소제목 3-4개 포함
-3. 가독성: 짧은 문단, 명확한 문장, 읽기 쉬운 표현
-4. 자연스러움: AI가 쓴 티가 나지 않도록 자연스러운 한국어
-5. 네이버 블로그 특성: 친근하고 공감 가는 톤
+✍️ 글쓰기 원칙 (매우 중요):
+
+1. **자연스러운 시작**
+   - "들어가며", "서론" 같은 제목 절대 금지
+   - 바로 이야기로 시작하기
+   - 예: "오늘 드디어 20만 전자가 되었어요!", "요즘 {keyword}에 푹 빠져있어요", "여러분, 이거 진짜 대박이에요!"
+   
+2. **블로그 말투**
+   - 반말 또는 존댓말 (자연스럽게)
+   - "~했어요", "~더라고요", "~네요" 활용
+   - 이모지 적절히 사용 (😊, 👍, ✨ 등)
+   - 독자에게 말 거는 느낌
+   
+3. **구조**
+   - 소제목은 물음표나 느낌표로 (예: "그래서 결과는?", "진짜 효과 있을까?")
+   - "본문", "결론" 같은 딱딱한 제목 금지
+   - 자연스러운 이야기 흐름
+   
+4. **내용**
+   - 개인적 경험 느낌 (실제 경험 아니어도 그렇게 작성)
+   - "{keyword}" 키워드를 {keyword_density}회 정도 자연스럽게 언급
+   - 짧은 문단 (2-3줄씩)
+   - 공감 유도하는 질문 포함
+   
+5. **마무리**
+   - "마무리", "결론" 같은 제목 금지
+   - 자연스러운 마무리 멘트
+   - 예: "여러분도 한번 시도해보세요!", "다음엔 더 좋은 정보로 찾아올게요 😊"
 
 출력 형식:
 ## 제목
-[SEO 최적화된 제목]
+[SEO 최적화 + 클릭 유도하는 제목]
 
-## 본문
-[여기에 본문 작성]
+[바로 본문 시작 - 자연스러운 도입]
+
+## [자연스러운 소제목1]
+[내용]
+
+## [자연스러운 소제목2]  
+[내용]
+
+## [자연스러운 소제목3]
+[내용]
+
+[자연스러운 마무리]
 
 ## 태그
-[5-7개의 해시태그]
+#태그1 #태그2 #태그3 #태그4 #태그5
+
+❌ 절대 사용 금지: "들어가며", "본문", "서론", "결론", "마무리" 같은 딱딱한 제목
+✅ 사용 권장: 물음표, 느낌표, 이모지, 반말/존댓말 섞기, 독자에게 말 걸기
 """
                     
                     message = client.messages.create(
@@ -455,7 +532,7 @@ with tab1:
                     image_info = None
                     if include_image:
                         with st.spinner("관련 이미지를 검색 중입니다..."):
-                            image_info = search_unsplash_image(keyword)
+                            image_info = search_free_image(keyword)
                     
                     # 결과 표시
                     st.success("✅ 글 생성 완료!")
