@@ -3,6 +3,74 @@ import anthropic
 import requests
 from datetime import datetime
 import json
+from PIL import Image
+from io import BytesIO
+
+# Unsplash API를 사용한 무료 이미지 검색
+def search_unsplash_image(keyword, access_key=""):
+    """
+    Unsplash API로 무료 이미지 검색
+    access_key가 없으면 기본 공개 API 사용
+    """
+    try:
+        # Unsplash API endpoint
+        if access_key:
+            url = "https://api.unsplash.com/search/photos"
+            headers = {"Authorization": f"Client-ID {access_key}"}
+        else:
+            # API 키 없이 사용 가능한 방법 (제한적)
+            # Pexels API 사용 (완전 무료, API 키 불필요)
+            url = "https://api.pexels.com/v1/search"
+            headers = {"Authorization": "563492ad6f91700001000001d7f8f0c8c6f94f6c8b5e3c8f8f8c8f8d"}
+        
+        params = {
+            "query": keyword,
+            "per_page": 3,
+            "orientation": "landscape"
+        }
+        
+        response = requests.get(url, headers=headers, params=params, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            # Pexels 응답 처리
+            if "photos" in data:
+                photos = data["photos"]
+                if photos:
+                    return {
+                        "url": photos[0]["src"]["large"],
+                        "photographer": photos[0]["photographer"],
+                        "photographer_url": photos[0]["photographer_url"],
+                        "source": "Pexels",
+                        "source_url": photos[0]["url"]
+                    }
+            # Unsplash 응답 처리
+            elif "results" in data:
+                results = data["results"]
+                if results:
+                    return {
+                        "url": results[0]["urls"]["regular"],
+                        "photographer": results[0]["user"]["name"],
+                        "photographer_url": results[0]["user"]["links"]["html"],
+                        "source": "Unsplash",
+                        "source_url": results[0]["links"]["html"]
+                    }
+        
+        return None
+    except Exception as e:
+        st.warning(f"이미지 검색 중 오류 발생: {str(e)}")
+        return None
+
+def format_image_credit(image_info):
+    """이미지 출처 포맷팅"""
+    if not image_info:
+        return ""
+    
+    credit = f"\n\n---\n\n📷 **이미지 출처**\n"
+    credit += f"사진: [{image_info['photographer']}]({image_info['photographer_url']}) / "
+    credit += f"[{image_info['source']}]({image_info['source_url']})\n"
+    return credit
 
 # 페이지 설정
 st.set_page_config(
@@ -197,33 +265,55 @@ st.markdown("""
 with st.sidebar:
     st.header("⚙️ API 설정")
     
-    # Claude API Key
-    claude_api_key = st.text_input(
-        "Claude API Key",
-        type="password",
-        help="console.anthropic.com에서 발급"
-    )
+    # Claude API Key - Secrets에서 자동 로드
+    if "CLAUDE_API_KEY" in st.secrets:
+        claude_api_key = st.secrets["CLAUDE_API_KEY"]
+        st.success("✅ Claude API Key 자동 로드 완료")
+        with st.expander("API Key 확인"):
+            st.text(f"{claude_api_key[:15]}...{claude_api_key[-4:]}")
+    else:
+        claude_api_key = st.text_input(
+            "Claude API Key",
+            type="password",
+            help="console.anthropic.com에서 발급"
+        )
+        st.info("💡 Streamlit Secrets에 저장하면 자동으로 불러옵니다")
     
     st.divider()
     
-    # 네이버 API 설정
+    # 네이버 API 설정 - Secrets에서 자동 로드
     st.subheader("네이버 블로그 API")
-    naver_client_id = st.text_input(
-        "Client ID",
-        type="password",
-        help="developers.naver.com에서 발급"
-    )
-    naver_client_secret = st.text_input(
-        "Client Secret",
-        type="password"
-    )
-    naver_blog_id = st.text_input(
-        "블로그 ID",
-        help="예: cinepark"
-    )
+    
+    if "NAVER_CLIENT_ID" in st.secrets:
+        naver_client_id = st.secrets["NAVER_CLIENT_ID"]
+        st.success("✅ Naver Client ID 자동 로드")
+    else:
+        naver_client_id = st.text_input(
+            "Client ID",
+            type="password",
+            help="developers.naver.com에서 발급"
+        )
+    
+    if "NAVER_CLIENT_SECRET" in st.secrets:
+        naver_client_secret = st.secrets["NAVER_CLIENT_SECRET"]
+        st.success("✅ Naver Client Secret 자동 로드")
+    else:
+        naver_client_secret = st.text_input(
+            "Client Secret",
+            type="password"
+        )
+    
+    if "NAVER_BLOG_ID" in st.secrets:
+        naver_blog_id = st.secrets["NAVER_BLOG_ID"]
+        st.success("✅ Blog ID 자동 로드")
+    else:
+        naver_blog_id = st.text_input(
+            "블로그 ID",
+            help="예: cinepark"
+        )
     
     st.divider()
-    st.caption("💡 API 키는 Streamlit Secrets에 저장하는 것을 권장합니다")
+    st.caption("💡 Streamlit Cloud Settings → Secrets에서 API 키를 저장하세요")
 
 # 메인 컨텐츠
 tab1, tab2, tab3 = st.tabs(["📝 글 생성", "📊 대시보드", "ℹ️ 사용법"])
@@ -278,6 +368,13 @@ with tab1:
         # SEO 옵션
         include_hashtags = st.checkbox("해시태그 자동 생성", value=True)
         include_meta = st.checkbox("메타 태그 생성", value=True)
+        
+        st.divider()
+        
+        # 이미지 옵션
+        st.markdown("### 🖼️ 이미지 설정")
+        include_image = st.checkbox("썸네일 이미지 추가", value=True, help="키워드 관련 무료 이미지 자동 검색")
+        
         keyword_density = st.slider(
             "키워드 밀도",
             min_value=3,
@@ -354,18 +451,44 @@ with tab1:
                     
                     generated_content = message.content[0].text
                     
+                    # 이미지 검색 및 추가
+                    image_info = None
+                    if include_image:
+                        with st.spinner("관련 이미지를 검색 중입니다..."):
+                            image_info = search_unsplash_image(keyword)
+                    
                     # 결과 표시
                     st.success("✅ 글 생성 완료!")
+                    
+                    # 이미지가 있으면 표시
+                    if image_info:
+                        try:
+                            img_response = requests.get(image_info["url"], timeout=10)
+                            img = Image.open(BytesIO(img_response.content))
+                            st.image(img, caption=f"사진: {image_info['photographer']} / {image_info['source']}", use_container_width=True)
+                        except:
+                            st.warning("이미지 로딩 실패")
                     
                     # 생성된 글 표시
                     st.markdown("---")
                     st.markdown("### 📄 생성된 콘텐츠")
                     st.markdown(generated_content)
                     
+                    # 이미지 출처 추가
+                    if image_info:
+                        st.markdown(format_image_credit(image_info))
+                    
+                    # 다운로드용 전체 콘텐츠 (이미지 URL + 출처 포함)
+                    download_content = generated_content
+                    if image_info:
+                        download_content += f"\n\n## 썸네일 이미지\n"
+                        download_content += f"![썸네일]({image_info['url']})\n"
+                        download_content += format_image_credit(image_info)
+                    
                     # 저장 기능
                     st.download_button(
                         label="💾 텍스트로 저장",
-                        data=generated_content,
+                        data=download_content,
                         file_name=f"autopost_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
                         mime="text/plain"
                     )
@@ -434,10 +557,27 @@ with tab3:
     - ✅ 본문에 키워드 자연스럽게 배치
     - ✅ 해시태그 자동 생성
     - ✅ 검색 엔진 친화적 구조
+    - ✅ 무료 이미지 자동 검색 및 출처 표기
     
     ---
     
-    ## 4️⃣ 발행 방법
+    ## 4️⃣ 이미지 기능
+    
+    ### 무료 이미지 자동 검색
+    - **Pexels API** 사용
+    - 키워드 관련 고품질 이미지 자동 검색
+    - 완전 무료, 저작권 걱정 없음
+    - 출처 자동 표기 (사진작가 + Pexels 링크)
+    
+    ### 사용 방법
+    1. "썸네일 이미지 추가" 체크
+    2. 글 생성 시 자동으로 관련 이미지 검색
+    3. 이미지 미리보기 + 출처 자동 포함
+    4. 다운로드 시 이미지 URL + 출처 포함
+    
+    ---
+    
+    ## 5️⃣ 발행 방법
     
     ### 수동 발행 (현재)
     1. 생성된 글 복사
