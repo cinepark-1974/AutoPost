@@ -15,8 +15,6 @@ st.set_page_config(
 st.markdown("""
 <style>
     /* 페이퍼로지 폰트 불러오기 */
-    @import url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.1/Paybooc.woff') format('woff');
-    
     @font-face {
         font-family: 'Paybooc';
         src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.1/Paybooc.woff') format('woff');
@@ -231,10 +229,10 @@ with st.sidebar:
 tab1, tab2, tab3 = st.tabs(["📝 글 생성", "📊 대시보드", "ℹ️ 사용법"])
 
 with tab1:
-    col1, col2 = st.columns(2)  # [2, 1]에서 2로 변경 - 균등 분할
+    col1, col2 = st.columns(2)  # 좌우 균등 분할
     
     with col1:
-        st.subheader("콘텐츠 설정")
+        st.markdown("### 📝 콘텐츠 설정")
         
         # 주제 선택
         category = st.selectbox(
@@ -262,8 +260,7 @@ with tab1:
         # 글 스타일
         writing_style = st.radio(
             "글 스타일",
-            ["정보 전달형 (팩트 중심)", "후기/리뷰형 (경험 중심)", "스토리텔링형 (감성적)"],
-            horizontal=True
+            ["정보 전달형 (팩트 중심)", "후기/리뷰형 (경험 중심)", "스토리텔링형 (감성적)"]
         )
         
         # 글 길이
@@ -276,7 +273,7 @@ with tab1:
         )
     
     with col2:
-        st.subheader("SEO 설정")
+        st.markdown("### 🎯 SEO 설정")
         
         # SEO 옵션
         include_hashtags = st.checkbox("해시태그 자동 생성", value=True)
