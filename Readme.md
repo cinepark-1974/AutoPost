@@ -1,4 +1,4 @@
-# ✍️ AutoPost - AI 블로그 자동화 시스템
+# AutoPost - AI 블로그 자동화 시스템
 
 Claude API 기반 범용 블로그 콘텐츠 자동 생성 + 네이버 블로그 자동 포스팅
 
@@ -117,7 +117,10 @@ AutoPost/
 
 4. **API 키 입력**
    ```toml
+   # Claude API (필수)
    CLAUDE_API_KEY = "sk-ant-api03-여기에실제키입력"
+   
+   # 네이버 블로그 API (선택사항 - 자동 발행용)
    NAVER_CLIENT_ID = "여기에실제ID입력"
    NAVER_CLIENT_SECRET = "여기에실제시크릿입력"
    NAVER_BLOG_ID = "cinepark"
@@ -127,9 +130,28 @@ AutoPost/
 
 #### 설정 완료 후:
 
-✅ **PC에서**: 사이드바에 "✅ API Key 자동 로드 완료" 표시
+✅ **PC에서**: 사이드바에 "✅ Claude API Key 자동 로드" 표시
 ✅ **모바일에서**: 동일하게 자동 로드, 입력 불필요
 ✅ **안전**: GitHub에 노출 안 됨, 암호화 저장
+
+### 네이버 개발자 센터 설정 (선택사항)
+
+자동 발행 기능을 사용하려면:
+
+1. **네이버 개발자 센터** 접속
+   - https://developers.naver.com
+
+2. **애플리케이션 등록**
+   - Application 등록
+   - 앱 이름: AutoPost
+   - 사용 API: 네이버 로그인
+
+3. **Client ID / Secret 발급**
+   - 발급받은 정보를 Secrets에 저장
+
+4. **블로그 ID 확인**
+   - 본인 블로그 URL: `blog.naver.com/cinepark`
+   - 블로그 ID: `cinepark`
 
 ### 로컬 개발용 (선택사항)
 
