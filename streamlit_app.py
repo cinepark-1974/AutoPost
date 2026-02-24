@@ -74,7 +74,7 @@ def format_image_credit(image_info):
 
 # 페이지 설정
 st.set_page_config(
-    page_title="AutoPost - AI 블로그 자동화",
+    page_title="AutoPost - 블로그 포스팅 자동화 툴",
     page_icon="✍️",
     layout="wide"
 )
@@ -265,13 +265,11 @@ st.markdown("""
 with st.sidebar:
     st.header("⚙️ API 설정")
     
-    # Claude API Key - Secrets에서 자동 로드 (더 안전한 방식)
+    # Claude API Key - Secrets에서 자동 로드
     try:
         if hasattr(st, 'secrets') and "CLAUDE_API_KEY" in st.secrets:
             claude_api_key = st.secrets["CLAUDE_API_KEY"]
-            st.success("✅ Claude API Key 자동 로드 완료")
-            with st.expander("🔑 API Key 확인"):
-                st.code(f"{claude_api_key[:20]}...{claude_api_key[-4:]}")
+            st.success("✅ Claude API Key 자동 로드")
         else:
             claude_api_key = st.text_input(
                 "Claude API Key",
@@ -279,16 +277,13 @@ with st.sidebar:
                 help="console.anthropic.com에서 발급",
                 key="claude_key_input"
             )
-            if not claude_api_key:
-                st.warning("⚠️ API Key를 입력하거나 Secrets에 저장해주세요")
-    except Exception as e:
+    except:
         claude_api_key = st.text_input(
             "Claude API Key",
             type="password",
             help="console.anthropic.com에서 발급",
-            key="claude_key_input_fallback"
+            key="claude_key_fallback"
         )
-        st.error(f"Secrets 로드 오류: {str(e)}")
     
     st.divider()
     
@@ -298,7 +293,7 @@ with st.sidebar:
     try:
         if hasattr(st, 'secrets') and "NAVER_CLIENT_ID" in st.secrets:
             naver_client_id = st.secrets["NAVER_CLIENT_ID"]
-            st.success("✅ Naver Client ID 자동 로드")
+            st.success("✅ Client ID 자동 로드")
         else:
             naver_client_id = st.text_input(
                 "Client ID",
@@ -315,7 +310,7 @@ with st.sidebar:
     try:
         if hasattr(st, 'secrets') and "NAVER_CLIENT_SECRET" in st.secrets:
             naver_client_secret = st.secrets["NAVER_CLIENT_SECRET"]
-            st.success("✅ Naver Client Secret 자동 로드")
+            st.success("✅ Client Secret 자동 로드")
         else:
             naver_client_secret = st.text_input(
                 "Client Secret",
@@ -334,28 +329,18 @@ with st.sidebar:
         else:
             naver_blog_id = st.text_input(
                 "블로그 ID",
-                help="예: cinepark"
+                help="예: cinepark",
+                placeholder="cinepark"
             )
     except:
         naver_blog_id = st.text_input(
             "블로그 ID",
-            help="예: cinepark"
+            help="예: cinepark",
+            placeholder="cinepark"
         )
     
     st.divider()
-    
-    # Secrets 디버깅 정보 (개발용)
-    with st.expander("🔧 Secrets 상태 확인"):
-        if hasattr(st, 'secrets'):
-            st.write("Secrets 사용 가능 ✅")
-            secret_keys = list(st.secrets.keys()) if st.secrets else []
-            st.write(f"저장된 키 개수: {len(secret_keys)}")
-            if secret_keys:
-                st.write("키 목록:", secret_keys)
-        else:
-            st.write("Secrets 사용 불가 ❌")
-    
-    st.caption("💡 Streamlit Cloud Settings → Secrets에서 API 키를 저장하세요")
+    st.caption("💡 Streamlit Cloud Settings → Secrets에 저장하면 자동 로드됩니다")
 
 # 메인 컨텐츠
 tab1, tab2, tab3 = st.tabs(["📝 글 생성", "📊 대시보드", "ℹ️ 사용법"])
@@ -372,6 +357,7 @@ with tab1:
             [
                 "영화 리뷰",
                 "책 리뷰",
+                "주식",
                 "맛집 후기",
                 "여행 후기",
                 "IT/기술",
@@ -409,7 +395,7 @@ with tab1:
         
         # SEO 옵션
         include_hashtags = st.checkbox("해시태그 자동 생성", value=True)
-        include_meta = st.checkbox("메타 태그 생성", value=True)
+        include_meta = st.checkbox("최신 화제 검색 🔥", value=True, help="키워드 관련 최신 뉴스를 찾아서 도입부에 활용합니다")
         
         st.divider()
         
@@ -445,6 +431,28 @@ with tab1:
         else:
             with st.spinner("AI가 최적화된 블로그 글을 작성 중입니다..."):
                 try:
+                    # 최신 뉴스/트렌드 검색 (선택 사항)
+                    recent_news = ""
+                    if include_meta:  # 메타 태그 생성 옵션을 뉴스 검색 옵션으로 활용
+                        try:
+                            with st.spinner("최신 화제 검색 중..."):
+                                # 간단한 뉴스 검색 (Google News RSS 활용)
+                                import urllib.parse
+                                search_url = f"https://news.google.com/rss/search?q={urllib.parse.quote(keyword)}&hl=ko&gl=KR&ceid=KR:ko"
+                                news_response = requests.get(search_url, timeout=5)
+                                
+                                if news_response.status_code == 200:
+                                    # RSS 파싱 (간단하게)
+                                    import xml.etree.ElementTree as ET
+                                    root = ET.fromstring(news_response.content)
+                                    items = root.findall('.//item')
+                                    
+                                    if items:
+                                        recent_titles = [item.find('title').text for item in items[:3]]
+                                        recent_news = f"\n\n최근 '{keyword}' 관련 화제:\n" + "\n".join([f"- {title}" for title in recent_titles])
+                        except:
+                            pass  # 검색 실패해도 글 생성은 계속
+                    
                     # Claude API 호출
                     client = anthropic.Anthropic(api_key=claude_api_key)
                     
@@ -462,41 +470,53 @@ with tab1:
 - 키워드: {keyword}
 - 스타일: {style_instruction[writing_style]}
 - 목표 글자 수: {word_count}자
+{recent_news}
 
 ✍️ 글쓰기 원칙 (매우 중요):
 
-1. **자연스러운 시작**
-   - "들어가며", "서론" 같은 제목 절대 금지
-   - 바로 이야기로 시작하기
-   - 예: "오늘 드디어 20만 전자가 되었어요!", "요즘 {keyword}에 푹 빠져있어요", "여러분, 이거 진짜 대박이에요!"
+1. **최신 화제로 자연스럽게 시작하기** ⭐ 
+   - 위에 제공된 최근 화제/뉴스를 활용해서 도입부 작성
+   - 예: "요즘 {keyword} 관련해서 화제네요!", "오늘 뉴스 보니까 {keyword} 이야기가..."
+   - 트렌드를 언급하면서 자연스럽게 본론으로 연결
+   - 화제가 없어도 "요즘", "최근", "오늘" 같은 표현으로 시작
    
-2. **블로그 말투**
+2. **자연스러운 시작**
+   - "들어가며", "서론" 같은 제목 절대 금지
+   - "안녕하세요. 영화 프로듀서의 블로그, CINEPARK입니다."로 시작하기
+   - 한 줄 띄고 자연스럽게 바로 이야기로 시작하기
+   - 예: "오늘은 {keyword} 얘기를 해 볼까 합니다"
+   
+3. **블로그 말투**
    - 반말 또는 존댓말 (자연스럽게)
    - "~했어요", "~더라고요", "~네요" 활용
    - 이모지 적절히 사용 (😊, 👍, ✨ 등)
    - 독자에게 말 거는 느낌
    
-3. **구조**
+4. **구조**
    - 소제목은 물음표나 느낌표로 (예: "그래서 결과는?", "진짜 효과 있을까?")
    - "본문", "결론" 같은 딱딱한 제목 금지
    - 자연스러운 이야기 흐름
    
-4. **내용**
+5. **내용**
    - 개인적 경험 느낌 (실제 경험 아니어도 그렇게 작성)
    - "{keyword}" 키워드를 {keyword_density}회 정도 자연스럽게 언급
    - 짧은 문단 (2-3줄씩)
    - 공감 유도하는 질문 포함
    
-5. **마무리**
+6. **마무리**
    - "마무리", "결론" 같은 제목 금지
-   - 자연스러운 마무리 멘트
-   - 예: "여러분도 한번 시도해보세요!", "다음엔 더 좋은 정보로 찾아올게요 😊"
+   - 마지막 멘트는 고정.
+   - 예: "https://ebook-product.kyobobook.co.kr/dig/epd/ebook/E000012093207
+     제목  | 감각구역
+     글 | 문성주, 박현
+     출판사  | 마카롱(교보문고)
+     많은  다운로드를 부탁합니다. 꾸벅"
 
 출력 형식:
 ## 제목
 [SEO 최적화 + 클릭 유도하는 제목]
 
-[바로 본문 시작 - 자연스러운 도입]
+[최신 화제로 자연스러운 도입 - 바로 본문 시작]
 
 ## [자연스러운 소제목1]
 [내용]
@@ -513,7 +533,7 @@ with tab1:
 #태그1 #태그2 #태그3 #태그4 #태그5
 
 ❌ 절대 사용 금지: "들어가며", "본문", "서론", "결론", "마무리" 같은 딱딱한 제목
-✅ 사용 권장: 물음표, 느낌표, 이모지, 반말/존댓말 섞기, 독자에게 말 걸기
+✅ 사용 권장: 물음표, 느낌표, 이모지, 반말/존댓말 섞기, 독자에게 말 걸기, 최신 트렌드 언급
 """
                     
                     message = client.messages.create(
