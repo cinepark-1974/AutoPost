@@ -29,6 +29,25 @@ st.markdown("""
         font-family: 'Paybooc', 'Apple SD Gothic Neo', sans-serif !important;
     }
     
+    /* 메인 배경 강제 설정 */
+    .main {
+        background-color: #f8f9fd !important;
+    }
+    
+    .stApp {
+        background-color: #f8f9fd !important;
+    }
+    
+    /* 전체 컨테이너 배경 */
+    [data-testid="stAppViewContainer"] {
+        background-color: #f8f9fd !important;
+    }
+    
+    /* 헤더 배경 */
+    header[data-testid="stHeader"] {
+        background-color: #f8f9fd !important;
+    }
+    
     /* 메인 타이틀 스타일 */
     h1 {
         color: #191970 !important;
@@ -212,7 +231,7 @@ with st.sidebar:
 tab1, tab2, tab3 = st.tabs(["📝 글 생성", "📊 대시보드", "ℹ️ 사용법"])
 
 with tab1:
-    col1, col2 = st.columns([2, 1])
+    col1, col2 = st.columns(2)  # [2, 1]에서 2로 변경 - 균등 분할
     
     with col1:
         st.subheader("콘텐츠 설정")
