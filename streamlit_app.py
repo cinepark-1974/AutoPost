@@ -5,72 +5,93 @@ from datetime import datetime
 import json
 from PIL import Image
 from io import BytesIO
+import time
 
-# Pexels API를 사용한 무료 이미지 검색
-def search_free_image(keyword):
-    """
-    Pexels API로 무료 이미지 검색
-    """
+# 상수 정의 - 책 정보 (고정)
+BOOK_INFO = {
+    "cover_url": "https://contents.kyobobook.co.kr/sih/fit-in/458x0/pdt/E000012093207.jpg",
+    "title": "감각구역",
+    "authors": "문성주, 박현",
+    "publisher": "마카롱(교보문고)",
+    "link": "https://ebook-product.kyobobook.co.kr/dig/epd/ebook/E000012093207"
+}
+
+# Stable Diffusion 이미지 생성
+def generate_sd_image(keyword, hf_token):
+    """Hugging Face Stable Diffusion으로 이미지 생성"""
     try:
-        # Pexels API (무료, 공식 API 키)
-        url = "https://api.pexels.com/v1/search"
-        headers = {
-            "Authorization": "563492ad6f9170000100000154d4f33a2fa54799bed66bbf3115e359"
+        if not hf_token:
+            return {
+                "url": f"https://source.unsplash.com/1200x800/?{keyword}",
+                "source": "Unsplash (API 키 없음)"
+            }
+        
+        API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
+        headers = {"Authorization": f"Bearer {hf_token}"}
+        
+        prompt = f"professional high-quality photograph, {keyword}, cinematic lighting, detailed, realistic, 8k"
+        
+        payload = {
+            "inputs": prompt,
+            "parameters": {
+                "negative_prompt": "low quality, blurry, distorted, ugly, text, watermark",
+                "num_inference_steps": 25
+            }
         }
         
-        # 한글 키워드는 영문으로 간단히 변환 (필요시)
-        search_query = keyword
-        
-        params = {
-            "query": search_query,
-            "per_page": 5,
-            "orientation": "landscape",
-            "size": "medium"
-        }
-        
-        response = requests.get(url, headers=headers, params=params, timeout=10)
+        response = requests.post(API_URL, headers=headers, json=payload, timeout=60)
         
         if response.status_code == 200:
-            data = response.json()
+            image = Image.open(BytesIO(response.content))
             
-            if "photos" in data and len(data["photos"]) > 0:
-                photo = data["photos"][0]
-                return {
-                    "url": photo["src"]["large"],
-                    "photographer": photo["photographer"],
-                    "photographer_url": photo["photographer_url"],
-                    "source": "Pexels",
-                    "source_url": photo["url"]
-                }
-        
-        # API 실패 시 대체 방법 - Unsplash Source (API 키 불필요)
-        return {
-            "url": f"https://source.unsplash.com/1200x800/?{keyword}",
-            "photographer": "Unsplash 커뮤니티",
-            "photographer_url": "https://unsplash.com",
-            "source": "Unsplash",
-            "source_url": f"https://unsplash.com/s/photos/{keyword}"
-        }
-        
+            # BytesIO로 저장
+            img_bytes = BytesIO()
+            image.save(img_bytes, format='PNG')
+            img_bytes.seek(0)
+            
+            return {
+                "image": image,
+                "bytes": img_bytes,
+                "source": "Stable Diffusion XL (AI 생성)"
+            }
+        else:
+            # 실패 시 Unsplash로 대체
+            return {
+                "url": f"https://source.unsplash.com/1200x800/?{keyword}",
+                "source": "Unsplash (대체)"
+            }
+            
     except Exception as e:
-        # 최종 대체: Unsplash Source (항상 작동)
+        st.warning(f"이미지 생성 실패: {str(e)}")
         return {
             "url": f"https://source.unsplash.com/1200x800/?{keyword}",
-            "photographer": "Unsplash 커뮤니티",
-            "photographer_url": "https://unsplash.com",
-            "source": "Unsplash",
-            "source_url": f"https://unsplash.com/s/photos/{keyword}"
+            "source": "Unsplash (오류 대체)"
         }
 
-def format_image_credit(image_info):
-    """이미지 출처 포맷팅"""
-    if not image_info:
-        return ""
-    
-    credit = f"\n\n---\n\n📷 **이미지 출처**\n"
-    credit += f"사진: [{image_info['photographer']}]({image_info['photographer_url']}) / "
-    credit += f"[{image_info['source']}]({image_info['source_url']})\n"
-    return credit
+# 책 홍보 섹션 생성
+def add_book_promotion():
+    """고정된 책 홍보 마크다운"""
+    return f"""
+
+---
+
+## 📚 제 저서를 소개합니다
+
+![{BOOK_INFO['title']}]({BOOK_INFO['cover_url']})
+
+**제목**: [{BOOK_INFO['title']}]({BOOK_INFO['link']})  
+**저자**: {BOOK_INFO['authors']}  
+**출판사**: {BOOK_INFO['publisher']}
+
+많은 다운로드를 부탁합니다. 꾸벅 🙇
+"""
+
+# 세션 스테이트 초기화
+if 'saved_posts' not in st.session_state:
+    st.session_state.saved_posts = []
+
+if 'image_count' not in st.session_state:
+    st.session_state.image_count = 0
 
 # 페이지 설정
 st.set_page_config(
@@ -82,7 +103,6 @@ st.set_page_config(
 # 커스텀 CSS
 st.markdown("""
 <style>
-    /* 페이퍼로지 폰트 불러오기 */
     @font-face {
         font-family: 'Paybooc';
         src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.1/Paybooc.woff') format('woff');
@@ -90,12 +110,10 @@ st.markdown("""
         font-style: normal;
     }
     
-    /* 전체 폰트 적용 */
     * {
         font-family: 'Paybooc', 'Apple SD Gothic Neo', sans-serif !important;
     }
     
-    /* 메인 배경 강제 설정 */
     .main {
         background-color: #f8f9fd !important;
     }
@@ -104,29 +122,23 @@ st.markdown("""
         background-color: #f8f9fd !important;
     }
     
-    /* 전체 컨테이너 배경 */
     [data-testid="stAppViewContainer"] {
         background-color: #f8f9fd !important;
     }
     
-    /* 헤더 배경 */
     header[data-testid="stHeader"] {
         background-color: #f8f9fd !important;
     }
     
-    /* 메인 타이틀 스타일 */
     h1 {
         color: #191970 !important;
         font-weight: 700 !important;
-        font-family: 'Paybooc' !important;
     }
     
-    /* 서브 타이틀 */
     h2, h3 {
         color: #191970 !important;
     }
     
-    /* 버튼 호버 효과 */
     .stButton > button {
         border: 2px solid #ffcb05 !important;
         font-weight: 600 !important;
@@ -136,45 +148,24 @@ st.markdown("""
     .stButton > button:hover {
         background-color: #ffcb05 !important;
         color: #191970 !important;
-        border-color: #191970 !important;
         transform: translateY(-2px) !important;
         box-shadow: 0 4px 12px rgba(255, 203, 5, 0.3) !important;
     }
     
-    /* Primary 버튼 */
     .stButton > button[kind="primary"] {
         background-color: #ffcb05 !important;
         color: #191970 !important;
         border: none !important;
     }
     
-    /* Secondary 버튼 */
     .stButton > button[kind="secondary"] {
         background-color: #191970 !important;
         color: #ffffff !important;
         border: 2px solid #ffcb05 !important;
     }
     
-    .stButton > button[kind="secondary"]:hover {
-        background-color: #ffcb05 !important;
-        color: #191970 !important;
-    }
-    
-    /* 입력 필드 포커스 */
-    .stTextInput > div > div > input:focus,
-    .stTextArea > div > div > textarea:focus {
-        border-color: #ffcb05 !important;
-        box-shadow: 0 0 0 1px #ffcb05 !important;
-    }
-    
-    /* 사이드바 스타일 */
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #e8ecf7 0%, #f8f9fd 100%) !important;
-    }
-    
-    /* 탭 스타일 */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
     }
     
     .stTabs [data-baseweb="tab"] {
@@ -183,66 +174,15 @@ st.markdown("""
         border-radius: 8px 8px 0 0;
         padding: 12px 24px;
         font-weight: 600;
-        border: 2px solid transparent;
     }
     
     .stTabs [aria-selected="true"] {
         background-color: #ffcb05 !important;
-        border-color: #191970 !important;
     }
     
-    /* 성공 메시지 */
     .stSuccess {
         background-color: #fffbea !important;
         border-left: 4px solid #ffcb05 !important;
-        color: #191970 !important;
-    }
-    
-    /* 정보 메시지 */
-    .stInfo {
-        background-color: #f0f2ff !important;
-        border-left: 4px solid #191970 !important;
-    }
-    
-    /* 메트릭 카드 */
-    [data-testid="stMetricValue"] {
-        color: #191970 !important;
-        font-weight: 700 !important;
-    }
-    
-    /* 다운로드 버튼 */
-    .stDownloadButton > button {
-        background-color: #191970 !important;
-        color: #ffcb05 !important;
-        border: 2px solid #ffcb05 !important;
-    }
-    
-    .stDownloadButton > button:hover {
-        background-color: #ffcb05 !important;
-        color: #191970 !important;
-    }
-    
-    /* 슬라이더 */
-    .stSlider > div > div > div > div {
-        background-color: #ffcb05 !important;
-    }
-    
-    /* 체크박스 */
-    .stCheckbox > label > div[data-testid="stMarkdownContainer"] > p {
-        color: #191970 !important;
-        font-weight: 500 !important;
-    }
-    
-    /* 라디오 버튼 */
-    .stRadio > label > div[data-testid="stMarkdownContainer"] > p {
-        color: #191970 !important;
-        font-weight: 500 !important;
-    }
-    
-    /* 셀렉트박스 */
-    .stSelectbox > label > div[data-testid="stMarkdownContainer"] > p {
-        color: #191970 !important;
-        font-weight: 600 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -257,15 +197,15 @@ st.markdown("""
 
 st.markdown("""
 <p style='text-align: center; color: #191970; font-size: 16px; margin-bottom: 30px;'>
-    Claude API 기반 범용 콘텐츠 생성 + 네이버 자동 포스팅
+    Claude AI + Stable Diffusion | 네이버 블로그 자동 포스팅
 </p>
 """, unsafe_allow_html=True)
 
-# 사이드바 - API 설정
+# 사이드바
 with st.sidebar:
     st.header("⚙️ API 설정")
     
-    # Claude API Key - Secrets에서 자동 로드
+    # Claude API Key
     try:
         if hasattr(st, 'secrets') and "CLAUDE_API_KEY" in st.secrets:
             claude_api_key = st.secrets["CLAUDE_API_KEY"]
@@ -274,53 +214,33 @@ with st.sidebar:
             claude_api_key = st.text_input(
                 "Claude API Key",
                 type="password",
-                help="console.anthropic.com에서 발급",
-                key="claude_key_input"
+                help="console.anthropic.com에서 발급"
             )
     except:
         claude_api_key = st.text_input(
             "Claude API Key",
             type="password",
-            help="console.anthropic.com에서 발급",
-            key="claude_key_fallback"
+            help="console.anthropic.com에서 발급"
         )
+    
+    # Hugging Face Token
+    try:
+        if hasattr(st, 'secrets') and "HUGGINGFACE_TOKEN" in st.secrets:
+            hf_token = st.secrets["HUGGINGFACE_TOKEN"]
+            st.success("✅ Hugging Face Token 자동 로드")
+        else:
+            hf_token = st.text_input(
+                "Hugging Face Token (이미지 생성)",
+                type="password",
+                help="huggingface.co에서 무료 발급"
+            )
+    except:
+        hf_token = None
     
     st.divider()
     
-    # 네이버 API 설정 - Secrets에서 자동 로드
+    # 네이버 API
     st.subheader("네이버 블로그 API")
-    
-    try:
-        if hasattr(st, 'secrets') and "NAVER_CLIENT_ID" in st.secrets:
-            naver_client_id = st.secrets["NAVER_CLIENT_ID"]
-            st.success("✅ Client ID 자동 로드")
-        else:
-            naver_client_id = st.text_input(
-                "Client ID",
-                type="password",
-                help="developers.naver.com에서 발급"
-            )
-    except:
-        naver_client_id = st.text_input(
-            "Client ID",
-            type="password",
-            help="developers.naver.com에서 발급"
-        )
-    
-    try:
-        if hasattr(st, 'secrets') and "NAVER_CLIENT_SECRET" in st.secrets:
-            naver_client_secret = st.secrets["NAVER_CLIENT_SECRET"]
-            st.success("✅ Client Secret 자동 로드")
-        else:
-            naver_client_secret = st.text_input(
-                "Client Secret",
-                type="password"
-            )
-    except:
-        naver_client_secret = st.text_input(
-            "Client Secret",
-            type="password"
-        )
     
     try:
         if hasattr(st, 'secrets') and "NAVER_BLOG_ID" in st.secrets:
@@ -329,91 +249,65 @@ with st.sidebar:
         else:
             naver_blog_id = st.text_input(
                 "블로그 ID",
-                help="예: cinepark",
                 placeholder="cinepark"
             )
     except:
         naver_blog_id = st.text_input(
             "블로그 ID",
-            help="예: cinepark",
             placeholder="cinepark"
         )
     
     st.divider()
-    st.caption("💡 Streamlit Cloud Settings → Secrets에 저장하면 자동 로드됩니다")
+    
+    # 통계
+    st.metric("오늘 생성 이미지", st.session_state.image_count)
+    st.metric("저장된 글", len(st.session_state.saved_posts))
+    
+    st.caption("💡 Secrets에 API 키 저장 권장")
 
-# 메인 컨텐츠
-tab1, tab2, tab3 = st.tabs(["📝 글 생성", "📊 대시보드", "ℹ️ 사용법"])
+# 메인 탭
+tab1, tab2, tab3, tab4 = st.tabs(["📝 글 생성", "📚 저장된 글", "📊 통계", "ℹ️ 사용법"])
 
 with tab1:
-    col1, col2 = st.columns(2)  # 좌우 균등 분할
+    col1, col2 = st.columns(2)
     
     with col1:
         st.markdown("### 📝 콘텐츠 설정")
         
-        # 주제 선택
         category = st.selectbox(
             "주제 카테고리",
-            [
-                "영화 리뷰",
-                "책 리뷰",
-                "주식",
-                "맛집 후기",
-                "여행 후기",
-                "IT/기술",
-                "일상/에세이",
-                "건강/운동",
-                "요리/레시피",
-                "자유 주제"
-            ]
+            ["영화 리뷰", "책 리뷰", "주식", "맛집 후기", "여행 후기", 
+             "IT/기술", "일상/에세이", "건강/운동", "요리/레시피", "자유 주제"]
         )
         
-        # 키워드 입력
         keyword = st.text_input(
             "키워드 입력",
-            placeholder="예: 부산 해운대 맛집, ChatGPT 활용법, 겨울 제주도",
-            help="검색에 노출되고 싶은 핵심 키워드를 입력하세요"
+            placeholder="예: 4차 상법 개정, 부산 맛집, ChatGPT"
         )
         
-        # 글 스타일
         writing_style = st.radio(
             "글 스타일",
             ["정보 전달형 (팩트 중심)", "후기/리뷰형 (경험 중심)", "스토리텔링형 (감성적)"]
         )
         
-        # 글 길이
-        word_count = st.slider(
-            "글 길이 (자)",
-            min_value=1000,
-            max_value=3000,
-            value=2000,
-            step=500
-        )
+        word_count = st.slider("글 길이 (자)", 1000, 3000, 2000, 500)
     
     with col2:
         st.markdown("### 🎯 SEO 설정")
         
-        # SEO 옵션
         include_hashtags = st.checkbox("해시태그 자동 생성", value=True)
-        include_meta = st.checkbox("최신 화제 검색 🔥", value=True, help="키워드 관련 최신 뉴스를 찾아서 도입부에 활용합니다")
+        include_news = st.checkbox("최신 화제 검색 🔥", value=True)
         
         st.divider()
         
-        # 이미지 옵션
         st.markdown("### 🖼️ 이미지 설정")
-        include_image = st.checkbox("썸네일 이미지 추가", value=True, help="키워드 관련 무료 이미지 자동 검색")
+        include_image = st.checkbox("AI 이미지 생성", value=True, 
+                                     help="Stable Diffusion으로 생성 (30-60초 소요)")
         
-        keyword_density = st.slider(
-            "키워드 밀도",
-            min_value=3,
-            max_value=10,
-            value=5,
-            help="본문에 키워드가 나타나는 횟수"
-        )
+        keyword_density = st.slider("키워드 밀도", 3, 10, 5)
     
     st.divider()
     
-    # 생성 버튼
     col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 2])
     
     with col_btn1:
@@ -431,32 +325,28 @@ with tab1:
         else:
             with st.spinner("AI가 최적화된 블로그 글을 작성 중입니다..."):
                 try:
-                    # 최신 뉴스/트렌드 검색 (선택 사항)
+                    # 최신 뉴스 검색
                     recent_news = ""
-                    if include_meta:  # 메타 태그 생성 옵션을 뉴스 검색 옵션으로 활용
+                    if include_news:
                         try:
-                            with st.spinner("최신 화제 검색 중..."):
-                                # 간단한 뉴스 검색 (Google News RSS 활용)
-                                import urllib.parse
-                                search_url = f"https://news.google.com/rss/search?q={urllib.parse.quote(keyword)}&hl=ko&gl=KR&ceid=KR:ko"
-                                news_response = requests.get(search_url, timeout=5)
+                            import urllib.parse
+                            search_url = f"https://news.google.com/rss/search?q={urllib.parse.quote(keyword)}&hl=ko&gl=KR&ceid=KR:ko"
+                            news_response = requests.get(search_url, timeout=5)
+                            
+                            if news_response.status_code == 200:
+                                import xml.etree.ElementTree as ET
+                                root = ET.fromstring(news_response.content)
+                                items = root.findall('.//item')
                                 
-                                if news_response.status_code == 200:
-                                    # RSS 파싱 (간단하게)
-                                    import xml.etree.ElementTree as ET
-                                    root = ET.fromstring(news_response.content)
-                                    items = root.findall('.//item')
-                                    
-                                    if items:
-                                        recent_titles = [item.find('title').text for item in items[:3]]
-                                        recent_news = f"\n\n최근 '{keyword}' 관련 화제:\n" + "\n".join([f"- {title}" for title in recent_titles])
+                                if items:
+                                    recent_titles = [item.find('title').text for item in items[:3]]
+                                    recent_news = f"\n\n최근 '{keyword}' 관련 화제:\n" + "\n".join([f"- {title}" for title in recent_titles])
                         except:
-                            pass  # 검색 실패해도 글 생성은 계속
+                            pass
                     
                     # Claude API 호출
                     client = anthropic.Anthropic(api_key=claude_api_key)
                     
-                    # 스타일에 따른 프롬프트 조정
                     style_instruction = {
                         "정보 전달형 (팩트 중심)": "정확한 정보와 데이터를 바탕으로 객관적으로 작성",
                         "후기/리뷰형 (경험 중심)": "개인적인 경험과 느낌을 중심으로 작성",
@@ -472,233 +362,234 @@ with tab1:
 - 목표 글자 수: {word_count}자
 {recent_news}
 
-✍️ 글쓰기 원칙 (매우 중요):
+✍️ 글쓰기 원칙:
 
-1. **최신 화제로 자연스럽게 시작하기** ⭐ 
-   - 위에 제공된 최근 화제/뉴스를 활용해서 도입부 작성
-   - 예: "요즘 {keyword} 관련해서 화제네요!", "오늘 뉴스 보니까 {keyword} 이야기가..."
-   - 트렌드를 언급하면서 자연스럽게 본론으로 연결
-   - 화제가 없어도 "요즘", "최근", "오늘" 같은 표현으로 시작
-   
-2. **자연스러운 시작**
-   - "들어가며", "서론" 같은 제목 절대 금지
-   - "안녕하세요. 영화 프로듀서의 블로그, CINEPARK입니다."로 시작하기
-   - 한 줄 띄고 자연스럽게 바로 이야기로 시작하기
-   - 예: "오늘은 {keyword} 얘기를 해 볼까 합니다"
-   
-3. **블로그 말투**
-   - 반말 또는 존댓말 (자연스럽게)
+1. **자연스러운 시작**
+   - "안녕하세요. 영화 프로듀서의 블로그, CINEPARK입니다."로 시작
+   - 한 줄 띄고 최신 화제나 흥미로운 도입부로 시작
+   - 예: "요즘 {keyword} 관련해서 화제네요!"
+
+2. **블로그 말투**
+   - 반말 또는 존댓말 자연스럽게
    - "~했어요", "~더라고요", "~네요" 활용
-   - 이모지 적절히 사용 (😊, 👍, ✨ 등)
-   - 독자에게 말 거는 느낌
-   
-4. **구조**
-   - 소제목은 물음표나 느낌표로 (예: "그래서 결과는?", "진짜 효과 있을까?")
-   - "본문", "결론" 같은 딱딱한 제목 금지
-   - 자연스러운 이야기 흐름
-   
-5. **내용**
-   - 개인적 경험 느낌 (실제 경험 아니어도 그렇게 작성)
-   - "{keyword}" 키워드를 {keyword_density}회 정도 자연스럽게 언급
+   - 이모지 적절히 사용 (😊, 👍, ✨)
+
+3. **구조**
+   - 소제목은 물음표나 느낌표로 (예: "그래서 결과는?")
    - 짧은 문단 (2-3줄씩)
-   - 공감 유도하는 질문 포함
-   
-6. **마무리**
-   - "마무리", "결론" 같은 제목 금지
-   - 마지막 멘트는 고정.
-   - 예: "https://ebook-product.kyobobook.co.kr/dig/epd/ebook/E000012093207
-     제목  | 감각구역
-     글 | 문성주, 박현
-     출판사  | 마카롱(교보문고)
-     많은  다운로드를 부탁합니다. 꾸벅"
+
+4. **키워드**
+   - "{keyword}"를 {keyword_density}회 자연스럽게 언급
+
+5. **마무리**
+   - 자연스러운 마무리 (책 홍보는 시스템이 자동 추가)
 
 출력 형식:
 ## 제목
-[SEO 최적화 + 클릭 유도하는 제목]
+[SEO 최적화된 제목]
 
-[최신 화제로 자연스러운 도입 - 바로 본문 시작]
+안녕하세요. 영화 프로듀서의 블로그, CINEPARK입니다.
 
-## [자연스러운 소제목1]
-[내용]
+[도입부...]
 
-## [자연스러운 소제목2]  
-[내용]
-
-## [자연스러운 소제목3]
-[내용]
-
-[자연스러운 마무리]
+## [소제목1]
+[내용...]
 
 ## 태그
 #태그1 #태그2 #태그3 #태그4 #태그5
 
-❌ 절대 사용 금지: "들어가며", "본문", "서론", "결론", "마무리" 같은 딱딱한 제목
-✅ 사용 권장: 물음표, 느낌표, 이모지, 반말/존댓말 섞기, 독자에게 말 걸기, 최신 트렌드 언급
+❌ 금지: "들어가며", "본문", "서론", "결론", "마무리"
+✅ 권장: 물음표, 느낌표, 이모지, 자연스러운 톤
 """
                     
                     message = client.messages.create(
                         model="claude-sonnet-4-20250514",
                         max_tokens=4000,
                         temperature=0.7,
-                        messages=[{
-                            "role": "user",
-                            "content": prompt
-                        }]
+                        messages=[{"role": "user", "content": prompt}]
                     )
                     
                     generated_content = message.content[0].text
                     
-                    # 이미지 검색 및 추가
+                    # 책 홍보 자동 추가
+                    generated_content += add_book_promotion()
+                    
+                    # 이미지 생성
                     image_info = None
                     if include_image:
-                        with st.spinner("관련 이미지를 검색 중입니다..."):
-                            image_info = search_free_image(keyword)
+                        with st.spinner("AI가 이미지를 생성 중입니다... (30-60초 소요)"):
+                            image_info = generate_sd_image(keyword, hf_token)
+                            if image_info:
+                                st.session_state.image_count += 1
+                    
+                    # 저장
+                    post_data = {
+                        "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        "keyword": keyword,
+                        "category": category,
+                        "content": generated_content,
+                        "image_info": image_info,
+                        "word_count": len(generated_content)
+                    }
+                    st.session_state.saved_posts.insert(0, post_data)
                     
                     # 결과 표시
                     st.success("✅ 글 생성 완료!")
                     
-                    # 이미지가 있으면 표시
+                    # 이미지 표시
                     if image_info:
-                        try:
-                            img_response = requests.get(image_info["url"], timeout=10)
-                            img = Image.open(BytesIO(img_response.content))
-                            st.image(img, caption=f"사진: {image_info['photographer']} / {image_info['source']}", use_container_width=True)
-                        except:
-                            st.warning("이미지 로딩 실패")
+                        if 'image' in image_info:
+                            st.image(image_info['image'], caption=f"생성: {image_info['source']}", use_container_width=True)
+                        elif 'url' in image_info:
+                            st.image(image_info['url'], caption=f"출처: {image_info['source']}", use_container_width=True)
                     
-                    # 생성된 글 표시
+                    # 콘텐츠 표시
                     st.markdown("---")
                     st.markdown("### 📄 생성된 콘텐츠")
                     st.markdown(generated_content)
                     
-                    # 이미지 출처 추가
-                    if image_info:
-                        st.markdown(format_image_credit(image_info))
-                    
-                    # 다운로드용 전체 콘텐츠 (이미지 URL + 출처 포함)
-                    download_content = generated_content
-                    if image_info:
-                        download_content += f"\n\n## 썸네일 이미지\n"
-                        download_content += f"![썸네일]({image_info['url']})\n"
-                        download_content += format_image_credit(image_info)
-                    
-                    # 저장 기능
+                    # 다운로드
                     st.download_button(
                         label="💾 텍스트로 저장",
-                        data=download_content,
+                        data=generated_content,
                         file_name=f"autopost_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
                         mime="text/plain"
                     )
                     
-                    # 자동 발행 선택 시
+                    # 이미지 다운로드
+                    if image_info and 'bytes' in image_info:
+                        st.download_button(
+                            label="🖼️ 이미지 저장",
+                            data=image_info['bytes'].getvalue(),
+                            file_name=f"image_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
+                            mime="image/png"
+                        )
+                    
                     if auto_post_button:
-                        st.markdown("---")
-                        if not naver_client_id or not naver_client_secret or not naver_blog_id:
-                            st.warning("⚠️ 네이버 API 정보를 입력하면 자동 발행이 가능합니다!")
-                        else:
-                            with st.spinner("네이버 블로그에 발행 중..."):
-                                # TODO: 네이버 API 연동 (추후 구현)
-                                st.info("🚧 네이버 자동 발행 기능은 개발 중입니다!")
-                                st.info("현재는 생성된 글을 복사해서 수동으로 발행해주세요.")
+                        st.info("🚧 네이버 자동 발행 기능은 개발 중입니다. 복사-붙여넣기로 발행해주세요.")
                     
                 except Exception as e:
                     st.error(f"❌ 오류 발생: {str(e)}")
-                    st.info("API Key가 올바른지, 크레딧이 있는지 확인해주세요.")
 
 with tab2:
-    st.subheader("📊 통계 대시보드")
-    st.info("🚧 개발 예정: 생성한 글 수, 발행한 글 수, API 사용량 등의 통계를 보여줍니다.")
+    st.subheader("📚 저장된 글 목록")
     
-    # 임시 통계
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("생성된 글", "0", "0")
-    with col2:
-        st.metric("발행된 글", "0", "0")
-    with col3:
-        st.metric("이번 달 사용량", "$0.00", "0%")
-    with col4:
-        st.metric("평균 글자 수", "0", "0")
+    if len(st.session_state.saved_posts) == 0:
+        st.info("아직 저장된 글이 없습니다. '글 생성' 탭에서 글을 만들어보세요!")
+    else:
+        st.success(f"총 {len(st.session_state.saved_posts)}개의 글이 저장되어 있습니다.")
+        
+        for idx, post in enumerate(st.session_state.saved_posts):
+            with st.expander(f"📄 {post['keyword']} ({post['category']}) - {post['timestamp']}"):
+                col_a, col_b = st.columns([3, 1])
+                
+                with col_a:
+                    st.markdown(f"**글자 수**: {post['word_count']}자")
+                    st.markdown(f"**작성 시간**: {post['timestamp']}")
+                
+                with col_b:
+                    st.download_button(
+                        label="💾 다운로드",
+                        data=post['content'],
+                        file_name=f"post_{idx+1}.txt",
+                        key=f"dl_{idx}",
+                        use_container_width=True
+                    )
+                
+                st.markdown("---")
+                
+                # 이미지
+                if post['image_info']:
+                    if 'image' in post['image_info']:
+                        st.image(post['image_info']['image'], width=400)
+                    elif 'url' in post['image_info']:
+                        st.image(post['image_info']['url'], width=400)
+                
+                # 콘텐츠
+                st.markdown(post['content'])
+        
+        # 전체 삭제
+        st.divider()
+        if st.button("🗑️ 전체 삭제", type="secondary"):
+            st.session_state.saved_posts = []
+            st.rerun()
 
 with tab3:
+    st.subheader("📊 사용 통계")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("생성된 글", len(st.session_state.saved_posts))
+    
+    with col2:
+        st.metric("생성된 이미지", st.session_state.image_count)
+    
+    with col3:
+        total_words = sum(p['word_count'] for p in st.session_state.saved_posts)
+        st.metric("총 글자 수", f"{total_words:,}자")
+    
+    with col4:
+        avg_words = total_words // len(st.session_state.saved_posts) if st.session_state.saved_posts else 0
+        st.metric("평균 글자 수", f"{avg_words:,}자")
+
+with tab4:
     st.subheader("📖 사용 방법")
     
     st.markdown("""
     ## 1️⃣ API 설정
     
-    ### Claude API Key 발급
+    ### Claude API Key (필수)
     1. [Anthropic Console](https://console.anthropic.com) 접속
-    2. 계정 생성 및 로그인
-    3. API Keys 메뉴에서 새 키 생성
-    4. 왼쪽 사이드바에 입력
+    2. API Keys → Create Key
+    3. 사이드바에 입력 또는 Secrets에 저장
     
-    ### 네이버 개발자 센터 (선택사항)
-    1. [네이버 개발자 센터](https://developers.naver.com) 접속
-    2. 애플리케이션 등록
-    3. Client ID/Secret 발급
+    ### Hugging Face Token (이미지 생성용, 무료)
+    1. [Hugging Face](https://huggingface.co) 가입
+    2. Settings → Access Tokens → New token
+    3. Read 권한으로 생성
+    
+    ### Streamlit Secrets 설정 (권장)
+    ```toml
+    CLAUDE_API_KEY = "sk-ant-api03-xxxxx"
+    HUGGINGFACE_TOKEN = "hf_xxxxx"
+    NAVER_BLOG_ID = "cinepark"
+    ```
     
     ---
     
     ## 2️⃣ 글 생성하기
     
-    1. **주제 선택**: 작성하고 싶은 카테고리 선택
-    2. **키워드 입력**: 검색 노출을 원하는 핵심 키워드 입력
-    3. **스타일 선택**: 글의 톤앤매너 선택
-    4. **생성 버튼**: 클릭하면 AI가 자동으로 글 작성
+    1. 주제 카테고리 선택
+    2. 키워드 입력 (예: "4차 상법 개정")
+    3. 글 스타일 선택
+    4. "글 생성" 클릭
     
     ---
     
-    ## 3️⃣ SEO 최적화
+    ## 3️⃣ 특징
     
-    - ✅ 제목에 키워드 자동 포함
-    - ✅ 본문에 키워드 자연스럽게 배치
-    - ✅ 해시태그 자동 생성
-    - ✅ 검색 엔진 친화적 구조
-    - ✅ 무료 이미지 자동 검색 및 출처 표기
-    
-    ---
-    
-    ## 4️⃣ 이미지 기능
-    
-    ### 무료 이미지 자동 검색
-    - **Pexels API** 사용
-    - 키워드 관련 고품질 이미지 자동 검색
-    - 완전 무료, 저작권 걱정 없음
-    - 출처 자동 표기 (사진작가 + Pexels 링크)
-    
-    ### 사용 방법
-    1. "썸네일 이미지 추가" 체크
-    2. 글 생성 시 자동으로 관련 이미지 검색
-    3. 이미지 미리보기 + 출처 자동 포함
-    4. 다운로드 시 이미지 URL + 출처 포함
-    
-    ---
-    
-    ## 5️⃣ 발행 방법
-    
-    ### 수동 발행 (현재)
-    1. 생성된 글 복사
-    2. 네이버 블로그에 직접 붙여넣기
-    3. 발행
-    
-    ### 자동 발행 (개발 예정)
-    - 네이버 API 연동 완료 후 버튼 클릭만으로 자동 발행
+    - ✅ Claude Sonnet 4.5로 자연스러운 글 생성
+    - ✅ Stable Diffusion으로 무료 AI 이미지 생성
+    - ✅ 최신 뉴스 자동 검색 및 반영
+    - ✅ 고정된 책 홍보 섹션 (감각구역)
+    - ✅ 생성된 글 자동 저장 및 목록 관리
     
     ---
     
     ## 💡 팁
     
-    - 키워드는 구체적일수록 좋습니다
-    - 다양한 스타일을 테스트해보세요
-    - 생성된 글을 약간 수정하면 더 자연스럽습니다
+    - 이미지 생성은 처음에 30-60초 소요 (모델 로딩)
+    - 이후엔 5-10초로 빨라집니다
+    - 저장된 글은 세션 종료 시 사라집니다 (영구 저장 아님)
+    - 중요한 글은 다운로드해두세요
     
     ---
     
     ## 📞 문의
     
-    버그 제보 및 기능 제안: [GitHub Issues](https://github.com/cinepark-1974/AutoPost/issues)
+    GitHub: [cinepark-1974/AutoPost](https://github.com/cinepark-1974/AutoPost)
     """)
 
-# Footer
 st.markdown("---")
-st.caption("Made with ❤️ using Claude API | AutoPost v1.0")
+st.caption("Made with ❤️ using Claude API + Stable Diffusion | AutoPost v2.0")
