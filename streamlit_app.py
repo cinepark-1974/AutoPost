@@ -417,10 +417,26 @@ with tab1:
                     # 이미지 생성
                     image_info = None
                     if include_image:
-                        with st.spinner("AI가 이미지를 생성 중입니다... (30-60초 소요)"):
-                            image_info = generate_sd_image(keyword, hf_token)
-                            if image_info:
-                                st.session_state.image_count += 1
+                        # Hugging Face Token 있으면 SD 시도, 없으면 바로 Unsplash
+                        if hf_token:
+                            with st.spinner("AI가 이미지를 생성 중입니다... (30-60초 소요)"):
+                                try:
+                                    image_info = generate_sd_image(keyword, hf_token)
+                                    if image_info:
+                                        st.session_state.image_count += 1
+                                except Exception as e:
+                                    st.warning(f"AI 이미지 생성 실패. Unsplash로 대체합니다.")
+                                    image_info = {
+                                        "url": f"https://source.unsplash.com/1200x800/?{keyword}",
+                                        "source": "Unsplash (대체)"
+                                    }
+                        else:
+                            # Token 없으면 바로 Unsplash
+                            st.info("💡 Hugging Face Token을 입력하면 AI 이미지를 생성할 수 있습니다.")
+                            image_info = {
+                                "url": f"https://source.unsplash.com/1200x800/?{keyword}",
+                                "source": "Unsplash"
+                            }
                     
                     # 저장
                     post_data = {
@@ -438,10 +454,13 @@ with tab1:
                     
                     # 이미지 표시
                     if image_info:
-                        if 'image' in image_info:
-                            st.image(image_info['image'], caption=f"생성: {image_info['source']}", use_container_width=True)
-                        elif 'url' in image_info:
-                            st.image(image_info['url'], caption=f"출처: {image_info['source']}", use_container_width=True)
+                        try:
+                            if 'image' in image_info:
+                                st.image(image_info['image'], caption=f"생성: {image_info['source']}", use_container_width=True)
+                            elif 'url' in image_info:
+                                st.image(image_info['url'], caption=f"출처: {image_info['source']}", use_container_width=True)
+                        except Exception as e:
+                            st.warning(f"이미지 표시 실패: {str(e)}")
                     
                     # 콘텐츠 표시
                     st.markdown("---")
