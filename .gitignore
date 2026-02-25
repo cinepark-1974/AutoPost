@@ -44,3 +44,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Generated images (선택사항 - 이미지 저장하려면 주석 처리)
+# generated_images/
