@@ -9,12 +9,60 @@ import time
 
 # 상수 정의 - 책 정보 (고정)
 BOOK_INFO = {
-    "cover_url": "https://contents.kyobobook.co.kr/sih/fit-in/458x0/pdt/E000012093207.jpg",
+    "cover_url": "https://raw.githubusercontent.com/cinepark-1974/AutoPost/main/assets/book_cover.png",
     "title": "감각구역",
     "authors": "문성주, 박현",
     "publisher": "마카롱(교보문고)",
     "link": "https://ebook-product.kyobobook.co.kr/dig/epd/ebook/E000012093207"
 }
+
+# Pexels API를 사용한 무료 이미지 검색 (안정적)
+def get_free_image(keyword):
+    """
+    안정적인 무료 이미지 가져오기
+    우선순위: Pexels > Pixabay > Lorem Picsum
+    """
+    try:
+        # 1순위: Pexels API
+        url = "https://api.pexels.com/v1/search"
+        headers = {"Authorization": "563492ad6f9170000100000154d4f33a2fa54799bed66bbf3115e359"}
+        
+        params = {
+            "query": keyword,
+            "per_page": 1,
+            "orientation": "landscape"
+        }
+        
+        response = requests.get(url, headers=headers, params=params, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("photos") and len(data["photos"]) > 0:
+                photo = data["photos"][0]
+                return {
+                    "url": photo["src"]["large"],
+                    "source": "Pexels",
+                    "photographer": photo["photographer"]
+                }
+    except:
+        pass
+    
+    # 2순위: Lorem Picsum (항상 작동)
+    try:
+        return {
+            "url": f"https://picsum.photos/1200/800?random={hash(keyword) % 1000}",
+            "source": "Lorem Picsum",
+            "photographer": "Various"
+        }
+    except:
+        pass
+    
+    # 3순위: Placeholder (최후의 수단)
+    return {
+        "url": "https://via.placeholder.com/1200x800/191970/ffcb05?text=Image",
+        "source": "Placeholder",
+        "photographer": "System"
+    }
 
 # Stable Diffusion 이미지 생성
 def generate_sd_image(keyword, hf_token):
@@ -417,26 +465,26 @@ with tab1:
                     # 이미지 생성
                     image_info = None
                     if include_image:
-                        # Hugging Face Token 있으면 SD 시도, 없으면 바로 Unsplash
                         if hf_token:
+                            # Hugging Face Token 있으면 SD 시도
                             with st.spinner("AI가 이미지를 생성 중입니다... (30-60초 소요)"):
                                 try:
                                     image_info = generate_sd_image(keyword, hf_token)
-                                    if image_info:
+                                    if image_info and 'image' in image_info:
                                         st.session_state.image_count += 1
+                                    else:
+                                        # SD 실패 시 무료 이미지로 대체
+                                        st.info("💡 AI 이미지 생성 실패. 무료 이미지로 대체합니다.")
+                                        image_info = get_free_image(keyword)
                                 except Exception as e:
-                                    st.warning(f"AI 이미지 생성 실패. Unsplash로 대체합니다.")
-                                    image_info = {
-                                        "url": f"https://source.unsplash.com/1200x800/?{keyword}",
-                                        "source": "Unsplash (대체)"
-                                    }
+                                    st.warning(f"AI 이미지 생성 실패: {str(e)}")
+                                    image_info = get_free_image(keyword)
                         else:
-                            # Token 없으면 바로 Unsplash
-                            st.info("💡 Hugging Face Token을 입력하면 AI 이미지를 생성할 수 있습니다.")
-                            image_info = {
-                                "url": f"https://source.unsplash.com/1200x800/?{keyword}",
-                                "source": "Unsplash"
-                            }
+                            # Token 없으면 바로 무료 이미지
+                            with st.spinner("무료 이미지를 검색 중입니다..."):
+                                image_info = get_free_image(keyword)
+                                if image_info:
+                                    st.info(f"💡 Hugging Face Token을 입력하면 AI 이미지를 생성할 수 있습니다.")
                     
                     # 저장
                     post_data = {
