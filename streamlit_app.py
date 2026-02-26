@@ -22,8 +22,18 @@ def save_api_key(key):
     return True
 
 def load_api_key():
+    """API 키 불러오기 (Secrets 우선)"""
+    # 1순위: Streamlit Secrets
+    try:
+        if hasattr(st, 'secrets') and "CLAUDE_API_KEY" in st.secrets:
+            return st.secrets["CLAUDE_API_KEY"]
+    except:
+        pass
+    
+    # 2순위: 세션 저장된 키
     if 'saved_api_key' in st.session_state:
         return st.session_state['saved_api_key']
+    
     return ""
 
 # 최신 트렌드 검색
@@ -520,41 +530,90 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# 히어로 이미지
+# 히어로 이미지 (안전한 로드)
 try:
-    st.image(HERO_IMAGE, use_container_width=True)
-except:
-    pass
+    from PIL import Image as PILImage
+    import requests as req
+    from io import BytesIO
+    
+    hero_url = "https://raw.githubusercontent.com/cinepark-1974/AutoPost/main/assets/hero_image.png"
+    resp = req.get(hero_url, timeout=5)
+    if resp.status_code == 200:
+        hero_img = PILImage.open(BytesIO(resp.content))
+        st.image(hero_img, use_container_width=True)
+    else:
+        # 이미지 로드 실패 시 대체 UI
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); 
+                    padding: 3rem; border-radius: 12px; text-align: center; margin-bottom: 2rem;">
+            <p style="font-size: 4rem; margin: 0;">✍️</p>
+            <p style="color: #666; margin-top: 1rem; font-size: 1.2rem;">AI 블로그 자동화 툴</p>
+        </div>
+        """, unsafe_allow_html=True)
+except Exception as e:
+    # 에러 시 대체 UI
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); 
+                padding: 3rem; border-radius: 12px; text-align: center; margin-bottom: 2rem;">
+        <p style="font-size: 4rem; margin: 0;">✍️</p>
+        <p style="color: #666; margin-top: 1rem; font-size: 1.2rem;">AI 블로그 자동화 툴</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
 # API 키 설정
 with st.expander("⚙️ API 설정", expanded=False):
+    saved_key = load_api_key()
+    
+    # Secrets에서 자동 로드 여부 확인
+    from_secrets = False
+    try:
+        if hasattr(st, 'secrets') and "CLAUDE_API_KEY" in st.secrets:
+            from_secrets = True
+            st.success("✅ Claude API Key 자동 로드 완료 (Secrets)")
+    except:
+        pass
+    
     col1, col2 = st.columns([4, 1])
     with col1:
-        saved_key = load_api_key()
         api_key = st.text_input(
-            "Claude API Key",
-            value=saved_key,
+            "Claude API Key" if not from_secrets else "Claude API Key (자동 로드됨)",
+            value=saved_key if not from_secrets else "••••••••",
             type="password",
-            placeholder="sk-ant-api03-..."
+            placeholder="sk-ant-api03-..." if not from_secrets else "자동 로드됨",
+            disabled=from_secrets
         )
     with col2:
         st.markdown("<div style='padding-top: 1.8rem;'></div>", unsafe_allow_html=True)
-        if st.button("저장"):
+        if not from_secrets and st.button("저장"):
             if api_key:
                 save_api_key(api_key)
                 st.success("✅ 저장됨")
     
+    if not from_secrets and not saved_key:
+        st.info("💡 Streamlit Cloud Secrets에 CLAUDE_API_KEY를 설정하면 자동 로드됩니다.")
+    
     st.markdown("<br>", unsafe_allow_html=True)
     
     # HuggingFace Token (선택사항)
-    hf_token = st.text_input(
-        "HuggingFace Token (AI 이미지 생성용 - 선택)",
-        type="password",
-        placeholder="hf_xxxxx",
-        help="huggingface.co에서 무료 발급. 입력하면 Stable Diffusion으로 이미지 생성"
-    )
+    hf_from_secrets = False
+    hf_token = ""
+    try:
+        if hasattr(st, 'secrets') and "HUGGINGFACE_TOKEN" in st.secrets:
+            hf_from_secrets = True
+            hf_token = st.secrets["HUGGINGFACE_TOKEN"]
+            st.success("✅ HuggingFace Token 자동 로드 완료 (Secrets)")
+    except:
+        pass
+    
+    if not hf_from_secrets:
+        hf_token = st.text_input(
+            "HuggingFace Token (AI 이미지 생성용 - 선택)",
+            type="password",
+            placeholder="hf_xxxxx",
+            help="huggingface.co에서 무료 발급. 입력하면 Stable Diffusion으로 이미지 생성"
+        )
 
 st.markdown("<br><br>", unsafe_allow_html=True)
 
