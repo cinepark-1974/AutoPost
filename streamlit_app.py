@@ -360,7 +360,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# CSS (깔끔한 흰색 디자인)
+# CSS (깔끔한 흰색 디자인 + 다크모드 대응)
 st.markdown("""
 <style>
     /* 기본 */
@@ -370,8 +370,17 @@ st.markdown("""
         padding: 2rem 1rem !important; 
         margin: 0 auto !important; 
     }
+    
+    /* 라이트/다크 모드 대응 */
     .stApp { 
         background: #ffffff !important; 
+    }
+    
+    /* 다크모드 방지 - 모든 배경 강제 */
+    [data-testid="stAppViewContainer"],
+    [data-testid="stHeader"],
+    .main {
+        background-color: #ffffff !important;
     }
     
     /* 헤더 */
@@ -394,6 +403,11 @@ st.markdown("""
         color: #4a4a4a !important;
         font-size: 1.1rem !important;
         font-weight: 600 !important;
+    }
+    
+    /* 일반 텍스트 */
+    p, span, div {
+        color: #262730 !important;
     }
     
     /* 버튼 */
@@ -421,10 +435,12 @@ st.markdown("""
         padding: 0.5rem 1rem !important;
     }
     
-    /* 입력 필드 */
+    /* 입력 필드 - 다크모드 대응 */
     .stTextInput > div > div > input,
     .stSelectbox > div > div > div,
     .stTextArea > div > div > textarea {
+        background-color: #ffffff !important;
+        color: #262730 !important;
         border: 1px solid #e0e0e0 !important;
         border-radius: 8px !important;
         padding: 0.75rem !important;
@@ -434,6 +450,7 @@ st.markdown("""
     .stTextArea > div > div > textarea:focus {
         border-color: #191970 !important;
         box-shadow: 0 0 0 1px #191970 !important;
+        background-color: #ffffff !important;
     }
     
     /* 라벨 */
@@ -444,6 +461,22 @@ st.markdown("""
         color: #4a4a4a !important;
         font-weight: 500 !important;
         font-size: 0.9rem !important;
+    }
+    
+    /* 체크박스 */
+    .stCheckbox > label {
+        color: #262730 !important;
+    }
+    
+    /* Expander */
+    .streamlit-expanderHeader {
+        background-color: #f8f9fa !important;
+        color: #191970 !important;
+    }
+    
+    [data-testid="stExpander"] {
+        background-color: #ffffff !important;
+        border: 1px solid #e0e0e0 !important;
     }
     
     /* 카드 */
@@ -458,7 +491,7 @@ st.markdown("""
     /* SEO 점수 */
     .seo-score {
         text-align: center;
-        background: #f8f9fa;
+        background: #f8f9fa !important;
         border: 2px solid #e0e0e0;
         border-radius: 12px;
         padding: 2rem;
@@ -468,13 +501,13 @@ st.markdown("""
     .score-number {
         font-size: 4rem;
         font-weight: 800;
-        color: #191970;
+        color: #191970 !important;
         margin: 0;
     }
     
     .score-label {
         font-size: 1.2rem;
-        color: #666;
+        color: #666 !important;
         margin-top: 0.5rem;
     }
     
@@ -508,57 +541,118 @@ st.markdown("""
         background-color: #191970 !important;
     }
     
+    /* 다운로드 버튼 */
+    .stDownloadButton > button {
+        background-color: #ffffff !important;
+        color: #191970 !important;
+        border: 1px solid #e0e0e0 !important;
+    }
+    
+    /* 마크다운 */
+    .stMarkdown {
+        color: #262730 !important;
+    }
+    
+    /* 코드 블록 */
+    code {
+        background-color: #f8f9fa !important;
+        color: #191970 !important;
+    }
+    
     /* 구분선 */
     hr {
         border: none;
         border-top: 1px solid #e0e0e0;
         margin: 2rem 0;
     }
+    
+    /* 프로그레스 바 */
+    .stProgress > div > div > div {
+        background-color: #191970 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# 헤더
+# 헤더 (Autosend 스타일)
 st.markdown("""
-<div style="text-align: center; padding: 2rem 0 3rem 0;">
-    <h1 style="margin-bottom: 0.5rem;">✍️ AutoPost</h1>
-    <p style="font-size: 1.2rem; color: #666; margin: 0;">
-        AI 블로그 자동화 툴
-    </p>
-    <p style="font-size: 0.95rem; color: #999; margin-top: 0.5rem;">
-        키워드만 입력하면 SEO 최적화된 완벽한 글 자동 생성
-    </p>
+<div style="padding: 4rem 0 2rem 0;">
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center;">
+        <!-- 왼쪽: 텍스트 -->
+        <div>
+            <h1 style="color: #191970; font-size: 2.8rem; font-weight: 700; margin: 0 0 1rem 0; line-height: 1.2;">
+                ✍️ AutoPost
+            </h1>
+            <p style="color: #191970; font-size: 1.3rem; font-weight: 500; margin: 0 0 1.5rem 0;">
+                AI 블로그 자동화 툴
+            </p>
+            <p style="color: #666; font-size: 1rem; line-height: 1.6; margin: 0;">
+                키워드만 입력하면 SEO 최적화된 완벽한 글 자동 생성
+            </p>
+        </div>
+        <!-- 오른쪽: 이미지 영역 (placeholder) -->
+        <div id="hero-image-container" style="text-align: center;">
+            <!-- 이미지는 아래 Python 코드에서 삽입 -->
+        </div>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
-# 히어로 이미지 (안전한 로드)
+# 히어로 이미지 (오른쪽에 배치)
+hero_image_html = ""
 try:
     from PIL import Image as PILImage
     import requests as req
     from io import BytesIO
+    import base64
     
     hero_url = "https://raw.githubusercontent.com/cinepark-1974/AutoPost/main/assets/hero_image.png"
     resp = req.get(hero_url, timeout=5)
     if resp.status_code == 200:
-        hero_img = PILImage.open(BytesIO(resp.content))
-        st.image(hero_img, use_container_width=True)
+        # 이미지를 base64로 인코딩
+        img_base64 = base64.b64encode(resp.content).decode()
+        hero_image_html = f'<img src="data:image/png;base64,{img_base64}" style="max-width: 100%; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">'
     else:
-        # 이미지 로드 실패 시 대체 UI
-        st.markdown("""
+        # 대체 UI
+        hero_image_html = '''
         <div style="background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); 
-                    padding: 3rem; border-radius: 12px; text-align: center; margin-bottom: 2rem;">
-            <p style="font-size: 4rem; margin: 0;">✍️</p>
-            <p style="color: #666; margin-top: 1rem; font-size: 1.2rem;">AI 블로그 자동화 툴</p>
+                    padding: 4rem 2rem; border-radius: 12px; text-align: center;">
+            <p style="font-size: 5rem; margin: 0;">✍️</p>
         </div>
-        """, unsafe_allow_html=True)
+        '''
 except Exception as e:
     # 에러 시 대체 UI
-    st.markdown("""
+    hero_image_html = '''
     <div style="background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); 
-                padding: 3rem; border-radius: 12px; text-align: center; margin-bottom: 2rem;">
-        <p style="font-size: 4rem; margin: 0;">✍️</p>
-        <p style="color: #666; margin-top: 1rem; font-size: 1.2rem;">AI 블로그 자동화 툴</p>
+                padding: 4rem 2rem; border-radius: 12px; text-align: center;">
+        <p style="font-size: 5rem; margin: 0;">✍️</p>
     </div>
-    """, unsafe_allow_html=True)
+    '''
+
+# JavaScript로 이미지를 컨테이너에 삽입
+st.markdown(f"""
+<script>
+    const container = document.getElementById('hero-image-container');
+    if (container) {{
+        container.innerHTML = `{hero_image_html}`;
+    }}
+</script>
+""", unsafe_allow_html=True)
+
+# Streamlit 방식으로도 이미지 표시 (JavaScript 실패 대비)
+col_left, col_right = st.columns(2)
+with col_right:
+    try:
+        from PIL import Image as PILImage
+        import requests as req
+        from io import BytesIO
+        
+        hero_url = "https://raw.githubusercontent.com/cinepark-1974/AutoPost/main/assets/hero_image.png"
+        resp = req.get(hero_url, timeout=5)
+        if resp.status_code == 200:
+            hero_img = PILImage.open(BytesIO(resp.content))
+            st.image(hero_img, use_container_width=True)
+    except:
+        pass
 
 st.markdown("<br>", unsafe_allow_html=True)
 
