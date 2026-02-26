@@ -14,8 +14,6 @@ BOOK_INFO = {
     "link": "https://ebook-product.kyobobook.co.kr/dig/epd/ebook/E000012093207"
 }
 
-HERO_IMAGE = "https://raw.githubusercontent.com/cinepark-1974/AutoPost/main/assets/hero_image.png"
-
 # API 키 저장/불러오기
 def save_api_key(key):
     st.session_state['saved_api_key'] = key
@@ -23,24 +21,19 @@ def save_api_key(key):
 
 def load_api_key():
     """API 키 불러오기 (Secrets 우선)"""
-    # 1순위: Streamlit Secrets
     try:
         if hasattr(st, 'secrets') and "CLAUDE_API_KEY" in st.secrets:
             return st.secrets["CLAUDE_API_KEY"]
     except:
         pass
-    
-    # 2순위: 세션 저장된 키
     if 'saved_api_key' in st.session_state:
         return st.session_state['saved_api_key']
-    
     return ""
 
 # 최신 트렌드 검색
 def search_latest_trends(keyword):
     """Google News RSS로 최신 트렌드 검색 (출처 포함)"""
     try:
-        # Google News RSS
         url = f"https://news.google.com/rss/search?q={keyword}&hl=ko&gl=KR&ceid=KR:ko"
         response = requests.get(url, timeout=10)
         
@@ -49,7 +42,7 @@ def search_latest_trends(keyword):
             root = ET.fromstring(response.content)
             
             news_items = []
-            for item in root.findall('.//item')[:5]:  # 최신 5개
+            for item in root.findall('.//item')[:5]:
                 title = item.find('title').text if item.find('title') is not None else ""
                 link = item.find('link').text if item.find('link') is not None else ""
                 pub_date = item.find('pubDate').text if item.find('pubDate') is not None else ""
@@ -63,7 +56,6 @@ def search_latest_trends(keyword):
                 })
             
             return news_items
-        
         return []
     except:
         return []
@@ -136,12 +128,11 @@ def analyze_seo(title, content, keyword):
     
     return score, feedback, improvements
 
-# 올인원 자동 생성 (트렌드 + 팩트체크)
+# 올인원 자동 생성
 def generate_optimized_post(keyword, category, word_count, claude_api_key, use_trends=True):
     try:
         client = anthropic.Anthropic(api_key=claude_api_key)
         
-        # 최신 트렌드 검색 (선택적)
         trend_info = ""
         if use_trends:
             trends = search_latest_trends(keyword)
@@ -314,26 +305,16 @@ def generate_optimized_post(keyword, category, word_count, claude_api_key, use_t
 
 # 이미지 생성
 def generate_sd_image(keyword, hf_token):
-    """Stable Diffusion으로 이미지 생성"""
     try:
         API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
         headers = {"Authorization": f"Bearer {hf_token}"}
-        
         prompt = f"{keyword}, high quality, detailed, professional photography, 8k"
-        
-        response = requests.post(
-            API_URL,
-            headers=headers,
-            json={"inputs": prompt},
-            timeout=60
-        )
-        
+        response = requests.post(API_URL, headers=headers, json={"inputs": prompt}, timeout=60)
         if response.status_code == 200:
             from PIL import Image
             import io
             image = Image.open(io.BytesIO(response.content))
             return {"image": image, "source": "Stable Diffusion XL"}
-        
         return None
     except:
         return None
@@ -360,307 +341,105 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# CSS (깔끔한 흰색 디자인 + 다크모드 대응)
+# CSS
 st.markdown("""
 <style>
-    /* 기본 */
     [data-testid="stSidebar"] { display: none !important; }
-    .main .block-container { 
-        max-width: 900px !important; 
-        padding: 2rem 1rem !important; 
-        margin: 0 auto !important; 
-    }
+    .main .block-container { max-width: 900px !important; padding: 2rem 1rem !important; margin: 0 auto !important; }
     
-    /* 라이트/다크 모드 대응 */
-    .stApp { 
-        background: #ffffff !important; 
-    }
-    
-    /* 다크모드 방지 - 모든 배경 강제 */
-    [data-testid="stAppViewContainer"],
-    [data-testid="stHeader"],
-    .main {
+    /* 다크모드 방지 */
+    .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"], .main {
         background-color: #ffffff !important;
     }
     
-    /* 헤더 */
-    h1 {
-        color: #191970 !important;
-        font-size: 2.5rem !important;
-        font-weight: 700 !important;
-        margin-bottom: 0.5rem !important;
-    }
-    
-    h2 {
-        color: #191970 !important;
-        font-size: 1.5rem !important;
-        font-weight: 600 !important;
-        margin-top: 2rem !important;
-        margin-bottom: 1rem !important;
-    }
-    
-    h3 {
-        color: #4a4a4a !important;
-        font-size: 1.1rem !important;
-        font-weight: 600 !important;
-    }
-    
-    /* 일반 텍스트 */
-    p, span, div {
-        color: #262730 !important;
-    }
+    /* 텍스트 */
+    h1 { color: #191970 !important; font-size: 2.5rem !important; font-weight: 700 !important; }
+    h2 { color: #191970 !important; font-size: 1.5rem !important; font-weight: 600 !important; }
+    h3 { color: #4a4a4a !important; font-size: 1.1rem !important; font-weight: 600 !important; }
+    p, span, div { color: #262730 !important; }
     
     /* 버튼 */
     .stButton > button[kind="primary"] {
-        background: #191970 !important;
-        color: white !important;
-        font-weight: 600 !important;
-        border: none !important;
-        padding: 0.75rem 2rem !important;
-        border-radius: 8px !important;
-        width: 100% !important;
-        font-size: 1rem !important;
+        background: #191970 !important; color: white !important; font-weight: 600 !important;
+        border: none !important; padding: 0.75rem 2rem !important; border-radius: 8px !important;
+        width: 100% !important; font-size: 1rem !important;
     }
-    
     .stButton > button[kind="primary"]:hover {
-        background: #252d7a !important;
-        box-shadow: 0 4px 12px rgba(25, 25, 112, 0.25) !important;
+        background: #252d7a !important; box-shadow: 0 4px 12px rgba(25, 25, 112, 0.25) !important;
     }
     
-    .stButton > button {
-        background: white !important;
-        color: #191970 !important;
-        border: 1px solid #e0e0e0 !important;
-        border-radius: 8px !important;
-        padding: 0.5rem 1rem !important;
+    /* 입력 필드 */
+    .stTextInput > div > div > input, .stSelectbox > div > div > div, .stTextArea > div > div > textarea {
+        background-color: #ffffff !important; color: #262730 !important;
+        border: 1px solid #e0e0e0 !important; border-radius: 8px !important; padding: 0.75rem !important;
     }
-    
-    /* 입력 필드 - 다크모드 대응 */
-    .stTextInput > div > div > input,
-    .stSelectbox > div > div > div,
-    .stTextArea > div > div > textarea {
-        background-color: #ffffff !important;
-        color: #262730 !important;
-        border: 1px solid #e0e0e0 !important;
-        border-radius: 8px !important;
-        padding: 0.75rem !important;
-    }
-    
-    .stTextInput > div > div > input:focus,
-    .stTextArea > div > div > textarea:focus {
-        border-color: #191970 !important;
-        box-shadow: 0 0 0 1px #191970 !important;
-        background-color: #ffffff !important;
-    }
-    
-    /* 라벨 */
-    .stTextInput > label,
-    .stSelectbox > label,
-    .stTextArea > label,
-    .stSlider > label {
-        color: #4a4a4a !important;
-        font-weight: 500 !important;
-        font-size: 0.9rem !important;
-    }
-    
-    /* 체크박스 */
-    .stCheckbox > label {
-        color: #262730 !important;
-    }
-    
-    /* Expander */
-    .streamlit-expanderHeader {
-        background-color: #f8f9fa !important;
-        color: #191970 !important;
-    }
-    
-    [data-testid="stExpander"] {
-        background-color: #ffffff !important;
-        border: 1px solid #e0e0e0 !important;
-    }
-    
-    /* 카드 */
-    .info-card {
-        background: #f8f9fa;
-        border: 1px solid #e0e0e0;
-        border-radius: 12px;
-        padding: 1.5rem;
-        margin: 1rem 0;
+    .stTextInput > div > div > input:focus, .stTextArea > div > div > textarea:focus {
+        border-color: #191970 !important; box-shadow: 0 0 0 1px #191970 !important;
     }
     
     /* SEO 점수 */
     .seo-score {
-        text-align: center;
-        background: #f8f9fa !important;
-        border: 2px solid #e0e0e0;
-        border-radius: 12px;
-        padding: 2rem;
-        margin: 2rem 0;
+        text-align: center; background: #f8f9fa !important;
+        border: 2px solid #e0e0e0; border-radius: 12px; padding: 2rem; margin: 2rem 0;
     }
+    .score-number { font-size: 4rem; font-weight: 800; color: #191970 !important; margin: 0; }
     
-    .score-number {
-        font-size: 4rem;
-        font-weight: 800;
-        color: #191970 !important;
-        margin: 0;
-    }
-    
-    .score-label {
-        font-size: 1.2rem;
-        color: #666 !important;
-        margin-top: 0.5rem;
-    }
-    
-    /* 성공/경고 메시지 */
-    .stSuccess {
-        background-color: #f0f9f4 !important;
-        border-left: 4px solid #10b981 !important;
-        color: #065f46 !important;
-    }
-    
-    .stWarning {
-        background-color: #fffbeb !important;
-        border-left: 4px solid #f59e0b !important;
-        color: #92400e !important;
-    }
-    
-    .stError {
-        background-color: #fef2f2 !important;
-        border-left: 4px solid #ef4444 !important;
-        color: #991b1b !important;
-    }
-    
-    .stInfo {
-        background-color: #eff6ff !important;
-        border-left: 4px solid #3b82f6 !important;
-        color: #1e40af !important;
-    }
-    
-    /* 슬라이더 */
-    .stSlider > div > div > div > div {
-        background-color: #191970 !important;
-    }
-    
-    /* 다운로드 버튼 */
-    .stDownloadButton > button {
-        background-color: #ffffff !important;
-        color: #191970 !important;
-        border: 1px solid #e0e0e0 !important;
-    }
-    
-    /* 마크다운 */
-    .stMarkdown {
-        color: #262730 !important;
-    }
-    
-    /* 코드 블록 */
-    code {
-        background-color: #f8f9fa !important;
-        color: #191970 !important;
-    }
-    
-    /* 구분선 */
-    hr {
-        border: none;
-        border-top: 1px solid #e0e0e0;
-        margin: 2rem 0;
-    }
-    
-    /* 프로그레스 바 */
-    .stProgress > div > div > div {
-        background-color: #191970 !important;
-    }
+    /* Expander */
+    .streamlit-expanderHeader { background-color: #f8f9fa !important; color: #191970 !important; }
+    [data-testid="stExpander"] { background-color: #ffffff !important; border: 1px solid #e0e0e0 !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# 헤더 (Autosend 스타일)
+# 헤더 (Autosend 스타일 - 2단 레이아웃)
 st.markdown("""
-<div style="padding: 4rem 0 2rem 0;">
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center;">
+<div style="padding: 4rem 0 3rem 0;">
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: center;">
         <!-- 왼쪽: 텍스트 -->
         <div>
             <h1 style="color: #191970; font-size: 2.8rem; font-weight: 700; margin: 0 0 1rem 0; line-height: 1.2;">
                 ✍️ AutoPost
             </h1>
-            <p style="color: #191970; font-size: 1.3rem; font-weight: 500; margin: 0 0 1.5rem 0;">
-                AI 블로그 자동화 툴
+            <p style="color: #666; font-size: 1.3rem; font-weight: 500; margin: 0 0 1.5rem 0; line-height: 1.5;">
+                키워드만 입력하면<br>
+                SEO 최적화된 완벽한 글 자동 생성
             </p>
-            <p style="color: #666; font-size: 1rem; line-height: 1.6; margin: 0;">
-                키워드만 입력하면 SEO 최적화된 완벽한 글 자동 생성
+            <p style="color: #999; font-size: 1rem; margin: 0;">
+                최신 트렌드 반영 • AI 이미지 생성 • 자동 팩트체크
             </p>
         </div>
-        <!-- 오른쪽: 이미지 영역 (placeholder) -->
-        <div id="hero-image-container" style="text-align: center;">
-            <!-- 이미지는 아래 Python 코드에서 삽입 -->
+        <!-- 오른쪽: 그래픽 -->
+        <div style="text-align: center;">
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                        padding: 3rem; border-radius: 20px; 
+                        box-shadow: 0 20px 60px rgba(102, 126, 234, 0.3);">
+                <div style="font-size: 6rem; margin: 0;">✍️</div>
+                <div style="color: white; font-size: 1.5rem; font-weight: 600; margin-top: 1rem;">
+                    AI 블로그 자동화
+                </div>
+                <div style="color: rgba(255,255,255,0.8); font-size: 1rem; margin-top: 0.5rem;">
+                    1분이면 완성
+                </div>
+            </div>
         </div>
     </div>
 </div>
+
+<!-- 모바일 대응 -->
+<style>
+    @media (max-width: 768px) {
+        div[style*="grid-template-columns"] {
+            display: block !important;
+        }
+        div[style*="grid-template-columns"] > div:last-child {
+            margin-top: 2rem;
+        }
+    }
+</style>
 """, unsafe_allow_html=True)
 
-# 히어로 이미지 (오른쪽에 배치)
-hero_image_html = ""
-try:
-    from PIL import Image as PILImage
-    import requests as req
-    from io import BytesIO
-    import base64
-    
-    hero_url = "https://raw.githubusercontent.com/cinepark-1974/AutoPost/main/assets/hero_image.png"
-    resp = req.get(hero_url, timeout=5)
-    if resp.status_code == 200:
-        # 이미지를 base64로 인코딩
-        img_base64 = base64.b64encode(resp.content).decode()
-        hero_image_html = f'<img src="data:image/png;base64,{img_base64}" style="max-width: 100%; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">'
-    else:
-        # 대체 UI
-        hero_image_html = '''
-        <div style="background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); 
-                    padding: 4rem 2rem; border-radius: 12px; text-align: center;">
-            <p style="font-size: 5rem; margin: 0;">✍️</p>
-        </div>
-        '''
-except Exception as e:
-    # 에러 시 대체 UI
-    hero_image_html = '''
-    <div style="background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); 
-                padding: 4rem 2rem; border-radius: 12px; text-align: center;">
-        <p style="font-size: 5rem; margin: 0;">✍️</p>
-    </div>
-    '''
-
-# JavaScript로 이미지를 컨테이너에 삽입
-st.markdown(f"""
-<script>
-    const container = document.getElementById('hero-image-container');
-    if (container) {{
-        container.innerHTML = `{hero_image_html}`;
-    }}
-</script>
-""", unsafe_allow_html=True)
-
-# Streamlit 방식으로도 이미지 표시 (JavaScript 실패 대비)
-col_left, col_right = st.columns(2)
-with col_right:
-    try:
-        from PIL import Image as PILImage
-        import requests as req
-        from io import BytesIO
-        
-        hero_url = "https://raw.githubusercontent.com/cinepark-1974/AutoPost/main/assets/hero_image.png"
-        resp = req.get(hero_url, timeout=5)
-        if resp.status_code == 200:
-            hero_img = PILImage.open(BytesIO(resp.content))
-            st.image(hero_img, use_container_width=True)
-    except:
-        pass
-
-st.markdown("<br>", unsafe_allow_html=True)
-
-# API 키 설정
+# API 설정
 with st.expander("⚙️ API 설정", expanded=False):
     saved_key = load_api_key()
-    
-    # Secrets에서 자동 로드 여부 확인
     from_secrets = False
     try:
         if hasattr(st, 'secrets') and "CLAUDE_API_KEY" in st.secrets:
@@ -690,7 +469,6 @@ with st.expander("⚙️ API 설정", expanded=False):
     
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # HuggingFace Token (선택사항)
     hf_from_secrets = False
     hf_token = ""
     try:
@@ -706,7 +484,7 @@ with st.expander("⚙️ API 설정", expanded=False):
             "HuggingFace Token (AI 이미지 생성용 - 선택)",
             type="password",
             placeholder="hf_xxxxx",
-            help="huggingface.co에서 무료 발급. 입력하면 Stable Diffusion으로 이미지 생성"
+            help="huggingface.co에서 무료 발급"
         )
 
 st.markdown("<br><br>", unsafe_allow_html=True)
@@ -715,26 +493,18 @@ st.markdown("<br><br>", unsafe_allow_html=True)
 st.markdown("## 🚀 글 자동 생성")
 
 col1, col2 = st.columns([2, 1])
-
 with col1:
-    keyword = st.text_input(
-        "키워드",
-        placeholder="예: 주식 초보 추천, 부산 맛집"
-    )
-
+    keyword = st.text_input("키워드", placeholder="예: 주식 초보 추천, 부산 맛집")
 with col2:
-    category = st.selectbox(
-        "카테고리",
-        ["영화", "책", "주식", "맛집", "여행", "IT", "일상", "건강", "요리"]
-    )
+    category = st.selectbox("카테고리", ["영화", "책", "주식", "맛집", "여행", "IT", "일상", "건강", "요리"])
 
 word_count = st.slider("목표 글자수", 1500, 3000, 2000, 100)
 
 col_opt1, col_opt2 = st.columns(2)
 with col_opt1:
-    include_image = st.checkbox("AI 이미지 생성", value=True, help="Pexels 또는 Stable Diffusion")
+    include_image = st.checkbox("AI 이미지 생성", value=True)
 with col_opt2:
-    use_trends = st.checkbox("최신 트렌드 반영", value=True, help="Google News에서 최신 정보 검색")
+    use_trends = st.checkbox("최신 트렌드 반영", value=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -751,7 +521,6 @@ if st.button("생성하기", type="primary"):
         
         status.text("제목 최적화 중...")
         progress.progress(33)
-        
         status.text("본문 생성 중...")
         progress.progress(66)
         
@@ -766,7 +535,6 @@ if st.button("생성하기", type="primary"):
             status.empty()
             progress.empty()
             
-            # 트렌드 정보 표시 (선택한 경우)
             if use_trends:
                 st.markdown("### 📰 참고한 최신 트렌드")
                 trend_data = search_latest_trends(keyword)
@@ -784,19 +552,16 @@ if st.button("생성하기", type="primary"):
                 else:
                     st.info("최신 뉴스를 찾을 수 없습니다.")
             
-            # SEO 점수
             st.markdown(f"""
             <div class="seo-score">
                 <div class="score-number">{result['seo_score']}</div>
-                <div class="score-label">/ 100점</div>
+                <div style="font-size: 1.2rem; color: #666; margin-top: 0.5rem;">/ 100점</div>
                 <div style="margin-top: 1rem; font-size: 1.1rem; color: #666;">
-                    {"🏆 상위 노출 가능" if result['seo_score'] >= 80 else 
-                     "👍 양호" if result['seo_score'] >= 60 else "⚠️ 개선 필요"}
+                    {"🏆 상위 노출 가능" if result['seo_score'] >= 80 else "👍 양호" if result['seo_score'] >= 60 else "⚠️ 개선 필요"}
                 </div>
             </div>
             """, unsafe_allow_html=True)
             
-            # 피드백
             st.markdown("### 📊 분석 결과")
             for fb in result['feedback']:
                 st.markdown(f"- {fb}")
@@ -808,11 +573,8 @@ if st.button("생성하기", type="primary"):
             
             st.markdown("---")
             
-            # 이미지 (체크박스로 선택한 경우만)
             if include_image:
                 st.markdown("### 🖼️ AI 생성 이미지")
-                
-                # HuggingFace Token이 있으면 Stable Diffusion 시도
                 if hf_token:
                     with st.spinner("AI가 이미지를 생성하는 중... (30-60초)"):
                         sd_result = generate_sd_image(keyword, hf_token)
@@ -823,16 +585,13 @@ if st.button("생성하기", type="primary"):
                             image_info = get_free_image(keyword)
                             st.image(image_info['url'], caption=f"출처: {image_info['source']}", use_container_width=True)
                 else:
-                    # Token 없으면 무료 이미지
                     image_info = get_free_image(keyword)
                     st.image(image_info['url'], caption=f"출처: {image_info['source']}", use_container_width=True)
                     st.info("💡 HuggingFace Token을 입력하면 AI로 이미지를 생성할 수 있습니다.")
             
-            # 글
             st.markdown("### 📄 생성된 글")
             st.markdown(result['content'])
             
-            # 다운로드
             st.download_button(
                 "💾 다운로드",
                 result['content'],
@@ -843,6 +602,6 @@ if st.button("생성하기", type="primary"):
 st.markdown("""
 <div style="text-align: center; padding: 3rem 0 2rem 0; color: #999; border-top: 1px solid #e0e0e0; margin-top: 4rem;">
     <p style="margin: 0;">Made with ❤️ by CINEPARK</p>
-    <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">AutoPost v4.0</p>
+    <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">AutoPost v5.0</p>
 </div>
 """, unsafe_allow_html=True)
