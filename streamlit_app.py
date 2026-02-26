@@ -30,6 +30,42 @@ def load_api_key():
         return st.session_state['saved_api_key']
     return ""
 
+# 키워드 추천
+def recommend_keywords(category, claude_api_key):
+    """카테고리별 인기 키워드 추천"""
+    try:
+        client = anthropic.Anthropic(api_key=claude_api_key)
+        
+        prompt = f"""당신은 블로그 SEO 전문가입니다. {category} 카테고리에서 현재 검색량이 많고 경쟁도가 낮은 황금 키워드 10개를 추천해주세요.
+
+조건:
+1. 월 검색량: 1,000~10,000 (너무 경쟁 치열하지 않음)
+2. 경쟁 문서: 100개 이하 (상위 노출 가능)
+3. 2026년 2월 현재 트렌드 반영
+4. 롱테일 키워드 포함 (3-5단어)
+
+출력 형식:
+1. [키워드] - [이유 한 줄]
+2. [키워드] - [이유 한 줄]
+...
+
+예시:
+1. 주식 초보 추천 어플 - 초보자 타겟, 구체적
+2. 부산 해운대 숨은 맛집 - 지역 특화, 롱테일
+
+지금 바로 {category} 카테고리 황금 키워드 10개를 추천하세요!"""
+        
+        message = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1000,
+            temperature=0.7,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        
+        return message.content[0].text
+    except Exception as e:
+        return f"추천 실패: {str(e)}"
+
 # 최신 트렌드 검색
 def search_latest_trends(keyword):
     """Google News RSS로 최신 트렌드 검색 (출처 포함)"""
@@ -492,6 +528,22 @@ with col1:
     keyword = st.text_input("키워드", placeholder="예: 주식 초보 추천, 부산 맛집")
 with col2:
     category = st.selectbox("카테고리", ["영화", "책", "주식", "맛집", "여행", "IT", "일상", "건강", "요리"])
+
+# 키워드 추천 버튼
+col_rec1, col_rec2 = st.columns([1, 3])
+with col_rec1:
+    if st.button("💡 키워드 추천", help="카테고리별 인기 키워드 추천"):
+        claude_key = load_api_key()
+        if not claude_key:
+            st.error("⚠️ API 키를 먼저 저장해주세요")
+        else:
+            with st.spinner(f"{category} 카테고리 황금 키워드 찾는 중..."):
+                recommendations = recommend_keywords(category, claude_key)
+                st.markdown("### 📝 추천 키워드")
+                st.markdown(recommendations)
+                st.info("💡 위 키워드 중 하나를 선택해서 입력란에 붙여넣으세요!")
+
+st.markdown("<br>", unsafe_allow_html=True)
 
 word_count = st.slider("목표 글자수", 1500, 3000, 2000, 100)
 
