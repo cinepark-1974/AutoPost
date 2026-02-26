@@ -26,6 +26,38 @@ def load_api_key():
         return st.session_state['saved_api_key']
     return ""
 
+# 최신 트렌드 검색
+def search_latest_trends(keyword):
+    """Google News RSS로 최신 트렌드 검색 (출처 포함)"""
+    try:
+        # Google News RSS
+        url = f"https://news.google.com/rss/search?q={keyword}&hl=ko&gl=KR&ceid=KR:ko"
+        response = requests.get(url, timeout=10)
+        
+        if response.status_code == 200:
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(response.content)
+            
+            news_items = []
+            for item in root.findall('.//item')[:5]:  # 최신 5개
+                title = item.find('title').text if item.find('title') is not None else ""
+                link = item.find('link').text if item.find('link') is not None else ""
+                pub_date = item.find('pubDate').text if item.find('pubDate') is not None else ""
+                source = item.find('source').text if item.find('source') is not None else "출처 불명"
+                
+                news_items.append({
+                    "title": title,
+                    "link": link,
+                    "date": pub_date[:16],
+                    "source": source
+                })
+            
+            return news_items
+        
+        return []
+    except:
+        return []
+
 # SEO 분석
 def analyze_seo(title, content, keyword):
     score = 0
@@ -94,42 +126,101 @@ def analyze_seo(title, content, keyword):
     
     return score, feedback, improvements
 
-# 올인원 자동 생성
-def generate_optimized_post(keyword, category, word_count, claude_api_key):
+# 올인원 자동 생성 (트렌드 + 팩트체크)
+def generate_optimized_post(keyword, category, word_count, claude_api_key, use_trends=True):
     try:
         client = anthropic.Anthropic(api_key=claude_api_key)
         
-        prompt = f"""네이버 블로그 글을 SEO 100점 목표로 작성해주세요.
+        # 최신 트렌드 검색 (선택적)
+        trend_info = ""
+        if use_trends:
+            trends = search_latest_trends(keyword)
+            if trends:
+                trend_text = "\n".join([
+                    f"- {item['title']}\n  출처: {item['source']}\n  링크: {item['link']}\n  날짜: {item['date']}"
+                    for item in trends
+                ])
+                trend_info = f"""
+
+📰 최신 트렌드 정보 (반드시 출처 표기):
+{trend_text}
+
+위 최신 뉴스를 참고하되, 다음 규칙을 반드시 지키세요:
+1. 뉴스 내용을 언급할 때는 반드시 출처 표기 (예: "OO신문에 따르면", "OO 보도에 의하면")
+2. 링크는 본문에 포함하지 말고, 사실만 언급
+3. 출처가 불확실한 정보는 "~라는 의견도 있습니다" 등으로 신중하게 표현
+4. 과장하지 말고 뉴스 내용을 정확하게 전달
+"""
+        
+        prompt = f"""당신은 월 방문자 10만 명을 달성한 인기 블로거입니다. 정확한 정보만 제공하는 것으로 유명하며, 독자들의 신뢰가 두텁습니다.
 
 키워드: {keyword}
 카테고리: {category}
 목표 글자수: {word_count}자
+{trend_info}
 
-📋 필수 요구사항:
+📋 필수 원칙:
 
-1. 제목 (25-35자):
-   - "{keyword}" 포함
-   - 숫자 포함 (5가지, 10분)
-   - 감탄사 (꿀팁, 대박)
+1. 정확성 (최우선):
+   - 확실한 정보만 작성
+   - 추측이나 과장 금지
+   - 출처 불명확하면 "~라는 의견도 있어요" 등으로 조심스럽게 표현
+   - 최신 트렌드 정보가 있다면 자연스럽게 언급
 
-2. 본문 ({word_count}자 이상):
-   - 시작: "안녕하세요. 영화 프로듀서의 블로그, CINEPARK입니다."
-   - "{keyword}" 5-7회 포함
-   - 소제목 3-5개 (물음표/느낌표)
-   - 이모지 3-5개
-   - 블로그 말투
+2. 방문자 증가 전략:
+   - 제목: 클릭 유도 + 구체적 (25-35자)
+   - 숫자 활용 (5가지, 10분, 2026년)
+   - 감탄사 (꿀팁, 대박, 놀라운, 진짜)
+   - 키워드 "{keyword}" 제목 앞쪽 배치
 
-3. 해시태그 10개
+3. 본문 작성:
+   - 첫 문장: "안녕하세요. 영화 프로듀서의 블로그, CINEPARK입니다."
+   - 도입: 독자 공감 유도 (질문 또는 경험)
+   - 본문: 실용적 정보 + 구체적 예시
+   - "{keyword}" 5-7회 자연스럽게 포함
+   - 소제목 3-5개 (물음표? 또는 느낌표!)
+   - 각 소제목마다 실전 팁 포함
+   - 개인 경험이나 후기 느낌으로 작성
+   - 이모지 3-5개 (😊, 👍, ✨, 💡, 🔥)
+   - 친근한 블로그 말투 (~했어요, ~더라고요, ~네요)
+   - **뉴스 내용 언급 시 반드시 출처 표기**
+     예: "최근 OO신문 보도에 따르면...", "OO매체에서 발표한 자료에 의하면..."
 
-출력:
-## [제목]
+4. SEO 최적화:
+   - 첫 문단에 키워드 포함
+   - 소제목에 키워드 관련어
+   - 본문 전체에 고르게 분산
+   - 해시태그 10개
+
+5. 독자 행동 유도:
+   - 마무리에 질문 또는 댓글 유도
+   - "여러분은 어떻게 생각하세요?"
+   - "댓글로 경험 공유해주세요!"
+
+6. 글자수: 반드시 {word_count}자 이상
+
+출력 형식:
+## [클릭 유도 제목]
 
 안녕하세요. 영화 프로듀서의 블로그, CINEPARK입니다.
 
-[본문...]
+[공감되는 도입 - 질문 또는 경험]
+
+## [실용적인 소제목1]?
+[구체적인 정보 + 팁]
+
+## [흥미로운 소제목2]!
+[실전 예시 + 경험]
+
+## [도움되는 소제목3]?
+[추가 정보 + 조언]
+
+[마무리 + 댓글 유도]
 
 ## 태그
-#{keyword} #태그들"""
+#{keyword} #2026 #최신 #추천 #후기 #팁 #정보 #꿀팁 #리뷰 #가이드
+
+지금 바로 독자들이 열광할 글을 작성하세요!"""
         
         message = client.messages.create(
             model="claude-sonnet-4-20250514",
@@ -486,11 +577,11 @@ with col2:
 
 word_count = st.slider("목표 글자수", 1500, 3000, 2000, 100)
 
-col_img1, col_img2 = st.columns([3, 1])
-with col_img1:
-    include_image = st.checkbox("AI 이미지 생성", value=True, help="Pexels에서 자동으로 이미지 검색")
-with col_img2:
-    pass
+col_opt1, col_opt2 = st.columns(2)
+with col_opt1:
+    include_image = st.checkbox("AI 이미지 생성", value=True, help="Pexels 또는 Stable Diffusion")
+with col_opt2:
+    use_trends = st.checkbox("최신 트렌드 반영", value=True, help="Google News에서 최신 정보 검색")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -511,7 +602,7 @@ if st.button("생성하기", type="primary"):
         status.text("본문 생성 중...")
         progress.progress(66)
         
-        result = generate_optimized_post(keyword, category, word_count, claude_key)
+        result = generate_optimized_post(keyword, category, word_count, claude_key, use_trends)
         
         status.text("SEO 분석 중...")
         progress.progress(100)
@@ -521,6 +612,24 @@ if st.button("생성하기", type="primary"):
         else:
             status.empty()
             progress.empty()
+            
+            # 트렌드 정보 표시 (선택한 경우)
+            if use_trends:
+                st.markdown("### 📰 참고한 최신 트렌드")
+                trend_data = search_latest_trends(keyword)
+                if trend_data:
+                    with st.expander("뉴스 정보 보기 (출처 포함)", expanded=True):
+                        for i, news in enumerate(trend_data, 1):
+                            st.markdown(f"""
+**{i}. {news['title']}**
+- 출처: {news['source']}
+- 날짜: {news['date']}
+- [기사 링크]({news['link']})
+""")
+                            if i < len(trend_data):
+                                st.markdown("---")
+                else:
+                    st.info("최신 뉴스를 찾을 수 없습니다.")
             
             # SEO 점수
             st.markdown(f"""
