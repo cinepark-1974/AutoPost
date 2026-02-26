@@ -390,36 +390,28 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 헤더 (Autosend 스타일 - 2단 레이아웃)
+# 헤더 (Autosend 스타일 - 왼쪽 텍스트 + 오른쪽 이미지)
 st.markdown("""
-<div style="padding: 4rem 0 3rem 0;">
+<div style="padding: 3rem 0 2rem 0;">
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: center;">
         <!-- 왼쪽: 텍스트 -->
         <div>
-            <h1 style="color: #191970; font-size: 2.8rem; font-weight: 700; margin: 0 0 1rem 0; line-height: 1.2;">
+            <h1 style="color: #191970; font-size: 2.5rem; font-weight: 700; margin: 0 0 1rem 0; line-height: 1.2;">
                 ✍️ AutoPost
             </h1>
-            <p style="color: #666; font-size: 1.3rem; font-weight: 500; margin: 0 0 1.5rem 0; line-height: 1.5;">
+            <p style="color: #191970; font-size: 1.3rem; font-weight: 500; margin: 0 0 1rem 0; line-height: 1.4;">
                 키워드만 입력하면<br>
                 SEO 최적화된 완벽한 글 자동 생성
             </p>
-            <p style="color: #999; font-size: 1rem; margin: 0;">
+            <p style="color: #666; font-size: 1rem; margin: 0; line-height: 1.6;">
                 최신 트렌드 반영 • AI 이미지 생성 • 자동 팩트체크
             </p>
         </div>
-        <!-- 오른쪽: 그래픽 -->
+        <!-- 오른쪽: 이미지 -->
         <div style="text-align: center;">
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                        padding: 3rem; border-radius: 20px; 
-                        box-shadow: 0 20px 60px rgba(102, 126, 234, 0.3);">
-                <div style="font-size: 6rem; margin: 0;">✍️</div>
-                <div style="color: white; font-size: 1.5rem; font-weight: 600; margin-top: 1rem;">
-                    AI 블로그 자동화
-                </div>
-                <div style="color: rgba(255,255,255,0.8); font-size: 1rem; margin-top: 0.5rem;">
-                    1분이면 완성
-                </div>
-            </div>
+            <img src="https://raw.githubusercontent.com/cinepark-1974/AutoPost/main/assets/hero_image.png" 
+                 alt="AI 블로그 자동화" 
+                 style="max-width: 100%; height: auto; border-radius: 12px;">
         </div>
     </div>
 </div>
