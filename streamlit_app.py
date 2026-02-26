@@ -66,18 +66,21 @@ def analyze_seo(title, content, keyword):
     feedback = []
     improvements = []
     
-    if keyword.lower() in title.lower():
+    # 제목에서 ## 제거하고 순수 텍스트만
+    clean_title = title.replace("#", "").strip()
+    
+    if keyword.lower() in clean_title.lower():
         score += 20
         feedback.append("✅ 제목에 키워드 포함")
     else:
         feedback.append("❌ 제목에 키워드 추가")
         improvements.append(f"제목에 '{keyword}' 추가")
     
-    if 15 <= len(title) <= 40:
+    if 15 <= len(clean_title) <= 40:
         score += 10
         feedback.append("✅ 제목 길이 적절")
     else:
-        feedback.append(f"⚠️ 제목 길이 조정 ({len(title)}자)")
+        feedback.append(f"⚠️ 제목 길이 조정 ({len(clean_title)}자)")
         improvements.append("제목 25-35자로 조정")
     
     content_length = len(content)
@@ -90,20 +93,20 @@ def analyze_seo(title, content, keyword):
             improvements.append(f"본문 {1500 - content_length}자 추가")
     
     keyword_count = content.lower().count(keyword.lower())
-    if 3 <= keyword_count <= 7:
+    if 5 <= keyword_count <= 10:
         score += 20
         feedback.append(f"✅ 키워드 밀도 적절 ({keyword_count}회)")
     else:
         feedback.append(f"⚠️ 키워드 조정 ({keyword_count}회)")
-        if keyword_count < 3:
-            improvements.append(f"'{keyword}' {3 - keyword_count}회 추가")
+        if keyword_count < 5:
+            improvements.append(f"'{keyword}' {5 - keyword_count}회 추가")
     
-    subtitle_count = content.count("##")
+    subtitle_count = content.count("##") - 1  # 첫 번째 제목 제외
     if subtitle_count >= 3:
         score += 10
         feedback.append(f"✅ 소제목 충분 ({subtitle_count}개)")
     else:
-        feedback.append(f"⚠️ 소제목 추가")
+        feedback.append(f"⚠️ 소제목 추가 필요")
         improvements.append("소제목 3개 이상 추가")
     
     emoji_pattern = re.compile("["
@@ -119,7 +122,7 @@ def analyze_seo(title, content, keyword):
         feedback.append("⚠️ 이모지 추가")
         improvements.append("이모지 3-5개 추가")
     
-    if "#" in content:
+    if "#" in content and "태그" in content:
         score += 15
         feedback.append("✅ 해시태그 포함")
     else:
@@ -527,23 +530,6 @@ if st.button("생성하기", type="primary"):
             status.empty()
             progress.empty()
             
-            if use_trends:
-                st.markdown("### 📰 참고한 최신 트렌드")
-                trend_data = search_latest_trends(keyword)
-                if trend_data:
-                    with st.expander("뉴스 정보 보기 (출처 포함)", expanded=True):
-                        for i, news in enumerate(trend_data, 1):
-                            st.markdown(f"""
-**{i}. {news['title']}**
-- 출처: {news['source']}
-- 날짜: {news['date']}
-- [기사 링크]({news['link']})
-""")
-                            if i < len(trend_data):
-                                st.markdown("---")
-                else:
-                    st.info("최신 뉴스를 찾을 수 없습니다.")
-            
             st.markdown(f"""
             <div class="seo-score">
                 <div class="score-number">{result['seo_score']}</div>
@@ -583,6 +569,25 @@ if st.button("생성하기", type="primary"):
             
             st.markdown("### 📄 생성된 글")
             st.markdown(result['content'])
+            
+            # 뉴스 출처는 글 아래에 표시
+            if use_trends:
+                st.markdown("---")
+                st.markdown("### 📰 참고한 최신 트렌드")
+                trend_data = search_latest_trends(keyword)
+                if trend_data:
+                    with st.expander("뉴스 정보 보기 (출처 포함)", expanded=False):
+                        for i, news in enumerate(trend_data, 1):
+                            st.markdown(f"""
+**{i}. {news['title']}**
+- 출처: {news['source']}
+- 날짜: {news['date']}
+- [기사 링크]({news['link']})
+""")
+                            if i < len(trend_data):
+                                st.markdown("---")
+                else:
+                    st.info("최신 뉴스를 찾을 수 없습니다.")
             
             st.download_button(
                 "💾 다운로드",
