@@ -380,6 +380,10 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# 세션 상태 초기화
+if 'post_history' not in st.session_state:
+    st.session_state['post_history'] = []
+
 # CSS
 st.markdown("""
 <style>
@@ -582,6 +586,20 @@ if st.button("생성하기", type="primary"):
             status.empty()
             progress.empty()
             
+            # 히스토리에 저장
+            st.session_state['post_history'].insert(0, {
+                'timestamp': datetime.now(),
+                'keyword': keyword,
+                'category': category,
+                'title': result['title'],
+                'content': result['content'],
+                'seo_score': result['seo_score']
+            })
+            
+            # 최대 20개까지만 저장
+            if len(st.session_state['post_history']) > 20:
+                st.session_state['post_history'] = st.session_state['post_history'][:20]
+            
             st.markdown(f"""
             <div class="seo-score">
                 <div class="score-number">{result['seo_score']}</div>
@@ -646,6 +664,40 @@ if st.button("생성하기", type="primary"):
                 result['content'],
                 file_name=f"post_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
             )
+
+# 작성 히스토리
+if st.session_state['post_history']:
+    st.markdown("---")
+    st.markdown("## 📝 작성 히스토리")
+    
+    for idx, post in enumerate(st.session_state['post_history']):
+        with st.expander(
+            f"**{post['title'][:50]}{'...' if len(post['title']) > 50 else ''}** "
+            f"(SEO: {post['seo_score']}점) - {post['timestamp'].strftime('%m/%d %H:%M')}"
+        ):
+            col1, col2, col3 = st.columns([2, 1, 1])
+            with col1:
+                st.markdown(f"**키워드:** {post['keyword']}")
+            with col2:
+                st.markdown(f"**카테고리:** {post['category']}")
+            with col3:
+                st.markdown(f"**점수:** {post['seo_score']}/100")
+            
+            st.markdown("---")
+            st.markdown(post['content'])
+            
+            col_btn1, col_btn2 = st.columns(2)
+            with col_btn1:
+                st.download_button(
+                    "💾 다운로드",
+                    post['content'],
+                    file_name=f"post_{post['timestamp'].strftime('%Y%m%d_%H%M%S')}.txt",
+                    key=f"download_{idx}"
+                )
+            with col_btn2:
+                if st.button("🗑️ 삭제", key=f"delete_{idx}"):
+                    st.session_state['post_history'].pop(idx)
+                    st.rerun()
 
 # Footer
 st.markdown("""
