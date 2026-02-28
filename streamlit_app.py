@@ -74,13 +74,23 @@ def recommend_keywords(category, claude_api_key):
     try:
         client = anthropic.Anthropic(api_key=claude_api_key)
         
+        # 현재 날짜 자동 생성
+        current_date = datetime.now()
+        year = current_date.year
+        month = current_date.month
+        month_name = current_date.strftime('%B')  # January, February...
+        season = "봄" if month in [3,4,5] else "여름" if month in [6,7,8] else "가을" if month in [9,10,11] else "겨울"
+        
         prompt = f"""당신은 블로그 SEO 전문가입니다. {category} 카테고리에서 현재 검색량이 많고 경쟁도가 낮은 황금 키워드 10개를 추천해주세요.
+
+📅 현재 시점: {year}년 {month}월 ({season}, {month_name})
 
 조건:
 1. 월 검색량: 1,000~10,000 (너무 경쟁 치열하지 않음)
 2. 경쟁 문서: 100개 이하 (상위 노출 가능)
-3. 2026년 2월 현재 트렌드 반영
+3. {year}년 {month}월 현재 트렌드 반영
 4. 롱테일 키워드 포함 (3-5단어)
+5. 계절성 고려 ({season} 시즌에 맞는 키워드)
 
 출력 형식:
 1. [키워드] - [이유 한 줄]
@@ -88,8 +98,8 @@ def recommend_keywords(category, claude_api_key):
 ...
 
 예시:
-1. 주식 초보 추천 어플 - 초보자 타겟, 구체적
-2. 부산 해운대 숨은 맛집 - 지역 특화, 롱테일
+1. {year} {category} 추천 어플 - 최신 년도 검색, 구체적
+2. {season} {category} 꿀팁 - 계절 특화, 검색 증가
 
 지금 바로 {category} 카테고리 황금 키워드 10개를 추천하세요!"""
         
@@ -243,6 +253,13 @@ def generate_optimized_post(keyword, category, word_count, claude_api_key, use_t
     try:
         client = anthropic.Anthropic(api_key=claude_api_key)
         
+        # 현재 날짜 자동 생성
+        current_date = datetime.now()
+        year = current_date.year
+        month = current_date.month
+        day = current_date.day
+        date_str = f"{year}년 {month}월 {day}일"
+        
         trend_info = ""
         
         # 사용자 제공 URL 처리
@@ -280,12 +297,19 @@ def generate_optimized_post(keyword, category, word_count, claude_api_key, use_t
 
 위 최신 뉴스를 참고하되, 다음 규칙을 반드시 지키세요:
 1. 뉴스 내용을 언급할 때는 반드시 출처 표기 (예: "OO신문에 따르면", "OO 보도에 의하면")
-2. 링크는 본문에 포함하지 말고, 사실만 언급
+2. 뉴스 언급 후 문장을 끝내고, 한 줄 띄운 뒤 링크 삽입
+   예시:
+   최근 테크크런치 보도에 따르면, AI 기술이 급속도로 발전하고 있습니다.
+   [테크크런치 기사 보기](링크)
+   
 3. 출처가 불확실한 정보는 "~라는 의견도 있습니다" 등으로 신중하게 표현
 4. 과장하지 말고 뉴스 내용을 정확하게 전달
+5. 링크 텍스트는 "[출처명 기사 보기]" 형식 사용
 """
         
         prompt = f"""당신은 월 방문자 10만 명을 달성한 인기 블로거입니다. 정확한 정보만 제공하는 것으로 유명하며, 독자들의 신뢰가 두텁습니다.
+
+📅 오늘 날짜: {date_str}
 
 키워드: {keyword}
 카테고리: {category}
@@ -297,8 +321,8 @@ def generate_optimized_post(keyword, category, word_count, claude_api_key, use_t
 1. 제목 (30점):
    - 반드시 "{keyword}" 포함 (정확히)
    - 25-35자 길이 엄수
-   - 숫자 활용 (5가지, 10분, 2026년)
-   - 예: "{keyword} 완벽 가이드! 2026년 최신 5가지"
+   - 숫자 활용 (5가지, 10분, {year}년)
+   - 예: "{keyword} 완벽 가이드! {year}년 최신 5가지"
 
 2. 키워드 밀도 (30점):
    - "{keyword}" 정확히 7-9회 반복
@@ -319,13 +343,14 @@ def generate_optimized_post(keyword, category, word_count, claude_api_key, use_t
 5. 해시태그 (10점):
    - 반드시 "## 태그" 섹션 추가
    - #{keyword} 포함하여 10개 작성
-   - 예: #{keyword} #2026 #최신 #추천 #후기 #팁 #정보 #꿀팁 #리뷰 #가이드
+   - 예: #{keyword} #{year} #최신 #추천 #후기 #팁 #정보 #꿀팁 #리뷰 #가이드
 
 📋 필수 구조:
 
 ## [{keyword} 관련 제목 25-35자]
 
-안녕하세요. 영화 프로듀서의 블로그, CINEPARK입니다.
+안녕하세요.
+영화 프로듀서의 블로그, CINEPARK입니다.
 
 [첫 문단에 "{keyword}" 1회 포함]
 [독자 공감 유도 - 질문 또는 경험]
@@ -333,6 +358,12 @@ def generate_optimized_post(keyword, category, word_count, claude_api_key, use_t
 ## {keyword} 핵심 정리! ✨
 ["{keyword}" 포함 + 이모지]
 [구체적 정보 2-3문단]
+
+뉴스 내용 언급 시:
+최근 OO신문 보도에 따르면, AI 기술이 발전하고 있습니다.
+[OO신문 기사 보기](링크)
+
+이런 식으로 문장 끝난 후 한 줄 바꿔서 링크 삽입
 
 ## {keyword} 선택 방법은? 🤔
 ["{keyword}" 포함 + 이모지]
@@ -350,15 +381,17 @@ def generate_optimized_post(keyword, category, word_count, claude_api_key, use_t
 "여러분은 어떻게 생각하세요? 댓글로 경험 공유해주세요!"
 
 ## 태그
-#{keyword} #2026 #최신 #추천 #후기 #팁 #정보 #꿀팁 #리뷰 #가이드
+#{keyword} #{year} #최신 #추천 #후기 #팁 #정보 #꿀팁 #리뷰 #가이드
 
 ⚠️ 체크리스트 (반드시 확인):
 ✅ 제목에 "{keyword}" 포함
 ✅ 제목 25-35자
+✅ 첫 인사: "안녕하세요." (줄바꿈) "영화 프로듀서의 블로그, CINEPARK입니다."
 ✅ 본문 {word_count}자 이상
 ✅ "{keyword}" 7-9회 사용
 ✅ 소제목 4-5개 (##)
 ✅ 이모지 5-7개
+✅ 뉴스 링크는 문장 끝 후 한 줄 띄고 [기사 보기](링크) 형식
 ✅ "## 태그" 섹션 + #{keyword} 포함 10개
 
 지금 바로 SEO 90점 이상 글을 작성하세요!"""
