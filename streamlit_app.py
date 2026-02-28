@@ -10,6 +10,73 @@ from pathlib import Path
 # 히스토리 파일 경로
 HISTORY_FILE = Path("/home/claude/post_history.json")
 
+# GitHub 저장 함수
+def save_to_github(content, title, keyword, seo_score):
+    """작성된 글을 GitHub에 저장"""
+    try:
+        # GitHub Token 확인
+        github_token = None
+        try:
+            if hasattr(st, 'secrets') and "GITHUB_TOKEN" in st.secrets:
+                github_token = st.secrets["GITHUB_TOKEN"]
+        except:
+            pass
+        
+        if not github_token:
+            return {"success": False, "message": "GitHub Token이 설정되지 않았습니다."}
+        
+        # 파일명 생성 (날짜_키워드.md)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_keyword = re.sub(r'[^a-zA-Z0-9가-힣]', '_', keyword)
+        filename = f"{timestamp}_{safe_keyword}.md"
+        
+        # GitHub API 설정
+        repo_owner = st.secrets.get("GITHUB_OWNER", "")
+        repo_name = st.secrets.get("GITHUB_REPO", "AutoPost")
+        
+        if not repo_owner:
+            return {"success": False, "message": "GitHub 사용자명이 설정되지 않았습니다."}
+        
+        # 파일 내용 (메타데이터 포함)
+        file_content = f"""---
+title: {title}
+keyword: {keyword}
+seo_score: {seo_score}
+date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+---
+
+{content}
+"""
+        
+        # GitHub API로 파일 업로드
+        url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/posts/{filename}"
+        headers = {
+            "Authorization": f"token {github_token}",
+            "Accept": "application/vnd.github.v3+json"
+        }
+        
+        import base64
+        encoded_content = base64.b64encode(file_content.encode()).decode()
+        
+        data = {
+            "message": f"Add post: {title}",
+            "content": encoded_content
+        }
+        
+        response = requests.put(url, headers=headers, json=data)
+        
+        if response.status_code in [200, 201]:
+            return {
+                "success": True, 
+                "message": "GitHub에 저장 완료!",
+                "url": f"https://github.com/{repo_owner}/{repo_name}/blob/main/posts/{filename}"
+            }
+        else:
+            return {"success": False, "message": f"GitHub 저장 실패: {response.status_code}"}
+            
+    except Exception as e:
+        return {"success": False, "message": f"오류: {str(e)}"}
+
 # 히스토리 불러오기
 def load_history():
     """히스토리 파일에서 불러오기"""
@@ -177,6 +244,57 @@ def fetch_url_content(url):
     except Exception as e:
         return None
 
+# SEO 자동 최적화 트리거
+def apply_seo_triggers(content, keyword, year):
+    """SEO 점수를 자동으로 높이는 후처리"""
+    
+    # 트리거 1: 태그 섹션 자동 추가
+    if "## 태그" not in content and "#태그" not in content:
+        tags = f"""
+
+## 태그
+#{keyword.replace(' ', '')} #{year} #최신 #추천 #정보 #꿀팁 #가이드 #리뷰 #후기 #팁"""
+        content += tags
+    
+    # 트리거 2: 소제목에 이모지 자동 추가
+    emoji_list = ["✨", "💡", "🎯", "⚠️", "🔥", "⭐", "👍"]
+    lines = content.split('\n')
+    emoji_index = 0
+    
+    for i, line in enumerate(lines):
+        # ## 소제목이지만 이모지가 없는 경우
+        if line.strip().startswith('##') and not any(emoji in line for emoji in emoji_list):
+            # 제목(첫 번째 ##)은 제외
+            if i > 0:
+                lines[i] = line.rstrip() + f" {emoji_list[emoji_index % len(emoji_list)]}"
+                emoji_index += 1
+    
+    content = '\n'.join(lines)
+    
+    # 트리거 3: 키워드 밀도가 너무 낮으면 자연스럽게 추가
+    keyword_count = content.lower().count(keyword.lower())
+    if keyword_count < 3:
+        # 첫 문단 뒤에 키워드 포함 문장 추가
+        insertion_point = content.find('\n\n', content.find('CINEPARK입니다.'))
+        if insertion_point > 0:
+            keyword_sentence = f"\n\n오늘은 {keyword}에 대해 자세히 알아보겠습니다!"
+            content = content[:insertion_point] + keyword_sentence + content[insertion_point:]
+    
+    # 트리거 4: 마무리 댓글 유도 문구 자동 추가
+    if "댓글" not in content and "공유" not in content:
+        closing = f"""
+
+여러분은 {keyword}에 대해 어떻게 생각하시나요? 댓글로 경험을 공유해주세요! 😊"""
+        
+        # 태그 섹션 앞에 삽입
+        tag_pos = content.find("## 태그")
+        if tag_pos > 0:
+            content = content[:tag_pos] + closing + "\n\n" + content[tag_pos:]
+        else:
+            content += closing
+    
+    return content
+
 # SEO 분석
 def analyze_seo(title, content, keyword):
     score = 0
@@ -186,46 +304,72 @@ def analyze_seo(title, content, keyword):
     # 제목에서 ## 제거하고 순수 텍스트만
     clean_title = title.replace("#", "").strip()
     
+    # 1. 제목에 키워드 포함 (25점)
     if keyword.lower() in clean_title.lower():
-        score += 20
+        score += 25
         feedback.append("✅ 제목에 키워드 포함")
     else:
         feedback.append("❌ 제목에 키워드 추가")
         improvements.append(f"제목에 '{keyword}' 추가")
     
-    if 15 <= len(clean_title) <= 40:
-        score += 10
-        feedback.append("✅ 제목 길이 적절")
+    # 2. 제목 길이 (20점) - 2026년 기준: 28-32자 최적
+    title_len = len(clean_title)
+    if 25 <= title_len <= 35:
+        score += 20
+        feedback.append(f"✅ 제목 길이 최적 ({title_len}자)")
+    elif 20 <= title_len <= 40:
+        score += 15
+        feedback.append(f"⚠️ 제목 길이 양호 ({title_len}자)")
+        improvements.append("제목 28-32자가 가장 이상적")
     else:
-        feedback.append(f"⚠️ 제목 길이 조정 ({len(clean_title)}자)")
-        improvements.append("제목 25-35자로 조정")
+        feedback.append(f"❌ 제목 길이 부적합 ({title_len}자)")
+        improvements.append("제목 28-32자로 조정")
     
+    # 3. 본문 길이 (20점) - 2026년 기준: 1500-3000자 최적
     content_length = len(content)
     if 1500 <= content_length <= 3000:
-        score += 15
-        feedback.append(f"✅ 본문 적절 ({content_length}자)")
-    else:
-        feedback.append(f"⚠️ 본문 조정 ({content_length}자)")
-        if content_length < 1500:
-            improvements.append(f"본문 {1500 - content_length}자 추가")
-    
-    keyword_count = content.lower().count(keyword.lower())
-    if 5 <= keyword_count <= 10:
         score += 20
+        feedback.append(f"✅ 본문 최적 ({content_length}자)")
+    elif 1000 <= content_length < 1500:
+        score += 15
+        feedback.append(f"⚠️ 본문 양호 ({content_length}자)")
+        improvements.append(f"본문 {1500 - content_length}자 추가 권장")
+    elif content_length > 3000:
+        score += 15
+        feedback.append(f"⚠️ 본문 다소 김 ({content_length}자)")
+        improvements.append("본문 3000자 이내 권장")
+    else:
+        feedback.append(f"❌ 본문 부족 ({content_length}자)")
+        improvements.append(f"본문 {1500 - content_length}자 추가 필요")
+    
+    # 4. 키워드 밀도 (15점) - 2026년 기준: 자연스럽게 3-8회
+    keyword_count = content.lower().count(keyword.lower())
+    if 3 <= keyword_count <= 8:
+        score += 15
         feedback.append(f"✅ 키워드 밀도 적절 ({keyword_count}회)")
-    else:
-        feedback.append(f"⚠️ 키워드 조정 ({keyword_count}회)")
-        if keyword_count < 5:
-            improvements.append(f"'{keyword}' {5 - keyword_count}회 추가")
-    
-    subtitle_count = content.count("##") - 1  # 첫 번째 제목 제외
-    if subtitle_count >= 3:
+    elif 2 <= keyword_count < 3 or 8 < keyword_count <= 12:
         score += 10
-        feedback.append(f"✅ 소제목 충분 ({subtitle_count}개)")
+        feedback.append(f"⚠️ 키워드 밀도 양호 ({keyword_count}회)")
     else:
-        feedback.append(f"⚠️ 소제목 추가 필요")
-        improvements.append("소제목 3개 이상 추가")
+        feedback.append(f"❌ 키워드 밀도 부적절 ({keyword_count}회)")
+        if keyword_count < 2:
+            improvements.append(f"'{keyword}' {3 - keyword_count}회 추가")
+        else:
+            improvements.append(f"'{keyword}' 과다, {keyword_count - 8}회 줄이기")
     
+    # 5. 소제목 (10점) - 2026년 기준: 3-5개 최적
+    subtitle_count = content.count("##") - 1  # 첫 번째 제목 제외
+    if 3 <= subtitle_count <= 5:
+        score += 10
+        feedback.append(f"✅ 소제목 최적 ({subtitle_count}개)")
+    elif subtitle_count >= 2:
+        score += 7
+        feedback.append(f"⚠️ 소제목 양호 ({subtitle_count}개)")
+    else:
+        feedback.append(f"❌ 소제목 부족 ({subtitle_count}개)")
+        improvements.append("소제목 3-5개 권장")
+    
+    # 6. 이모지 (5점)
     emoji_pattern = re.compile("["
         u"\U0001F600-\U0001F64F"
         u"\U0001F300-\U0001F5FF"
@@ -233,18 +377,19 @@ def analyze_seo(title, content, keyword):
         "]+", flags=re.UNICODE)
     
     if emoji_pattern.search(content):
-        score += 10
+        score += 5
         feedback.append("✅ 이모지 사용")
     else:
-        feedback.append("⚠️ 이모지 추가")
-        improvements.append("이모지 3-5개 추가")
+        feedback.append("⚠️ 이모지 추가 권장")
+        improvements.append("이모지 2-3개 추가")
     
-    if "#" in content and "태그" in content:
-        score += 15
+    # 7. 해시태그 (5점)
+    if "#" in content or "태그" in content:
+        score += 5
         feedback.append("✅ 해시태그 포함")
     else:
-        feedback.append("⚠️ 해시태그 추가")
-        improvements.append("해시태그 10개 추가")
+        feedback.append("⚠️ 해시태그 추가 권장")
+        improvements.append("해시태그 5개 이상 추가")
     
     return score, feedback, improvements
 
@@ -307,7 +452,7 @@ def generate_optimized_post(keyword, category, word_count, claude_api_key, use_t
 5. 링크 텍스트는 "[출처명 기사 보기]" 형식 사용
 """
         
-        prompt = f"""당신은 월 방문자 10만 명을 달성한 인기 블로거입니다. 정확한 정보만 제공하는 것으로 유명하며, 독자들의 신뢰가 두텁습니다.
+        prompt = f"""당신은 월 방문자 10만 명을 달성한 네이버 블로그 인기 블로거입니다. 
 
 📅 오늘 날짜: {date_str}
 
@@ -316,85 +461,221 @@ def generate_optimized_post(keyword, category, word_count, claude_api_key, use_t
 목표 글자수: {word_count}자
 {trend_info}
 
-🎯 SEO 점수 90점 이상 필수 조건:
+⚠️ 네이버 블로그 운영정책 필수 준수사항:
 
-1. 제목 (30점):
-   - 반드시 "{keyword}" 포함 (정확히)
-   - 25-35자 길이 엄수
-   - 숫자 활용 (5가지, 10분, {year}년)
-   - 예: "{keyword} 완벽 가이드! {year}년 최신 5가지"
+1. 개인 경험과 진정성
+   - "나의 생각, 느낌, 관심을 기록"하는 개인 공간
+   - 나의 실제 경험, 의견, 후기를 담을 것
+   - AI가 작성했다는 느낌 최소화
+   - 자연스러운 구어체 사용
 
-2. 키워드 밀도 (30점):
-   - "{keyword}" 정확히 7-9회 반복
-   - 첫 문단에 1회 필수
-   - 각 소제목에 관련 단어 포함
-   - 본문 전체에 고르게 분산
+2. 광고/리뷰 관련 (중요!)
+   - 광고주로부터 금전 제공받았다면 반드시 명시
+   - 내돈내산 리뷰가 아니면 명확히 표시
+   - 표시광고법 준수 필수
+   - 과도한 상업성 지양
 
-3. 소제목 (20점):
-   - ## 형식으로 4-5개 필수
-   - 각 소제목은 물음표(?) 또는 느낌표(!)로 끝
-   - 예: "## {keyword} 선택 방법은?"
+3. 커뮤니케이션 에티켓
+   - 타인 비방, 폄하 금지
+   - 불쾌감 주는 내용 금지
+   - 상호 존중 태도 유지
 
-4. 이모지 (10점):
-   - 본문에 정확히 5-7개 삽입
-   - 추천: 😊 👍 ✨ 💡 🔥 ⭐ 📌
-   - 각 소제목 또는 주요 포인트에 배치
+4. 금지 사항
+   - 음란물 절대 금지
+   - 타인 명예훼손 금지
+   - 저작권 침해 금지
+   - 청소년 유해 콘텐츠 금지
 
-5. 해시태그 (10점):
-   - 반드시 "## 태그" 섹션 추가
-   - #{keyword} 포함하여 10개 작성
-   - 예: #{keyword} #{year} #최신 #추천 #후기 #팁 #정보 #꿀팁 #리뷰 #가이드
+🎯 네이버 블로그 2026년 최적화 작성 규칙:
 
-📋 필수 구조:
+1. 제목 (매우 중요!):
+   - **최적 길이: 28-32자** (2026년 검색 알고리즘)
+   - 형식: "{keyword} 직접 해봤어요! 솔직 후기"
+   - 또는: "{keyword} 알아보면서 느낀 점 {year}년"
+   - {keyword} 반드시 포함
+   - 숫자 활용 권장 (5가지, 10분 등)
+   - 클릭베이트보다 정직한 제목
 
-## [{keyword} 관련 제목 25-35자]
+2. 인사말 (반드시):
+   안녕하세요.
+   영화 프로듀서의 블로그, CINEPARK입니다.
+
+3. 본문 길이 (중요!):
+   - **최적 길이: 1500-3000자** (2026년 기준)
+   - 너무 짧으면 저품질 판정
+   - 너무 길면 이탈률 증가
+   - 목표: {word_count}자 내외
+
+4. 도입부 (개인 경험 - CINEPARK의 배경 활용):
+   
+   **CINEPARK 배경:**
+   - 영화: 기획 프로듀서, <광해>, <하녀>, <동갑내기 과외하기> 등 제작
+   - 국제: 인도네시아/베트남/일본 공동제작, <수상한 그녀> 리메이크
+   - 여행: 런던 체류(2005-2006), 도쿄 체류(1999), 25개국 이상 방문
+   - 학력: 정치외교학과 졸업, 문화콘텐츠학과 시나리오 전공 석사
+   - 저서: <감각구역> 소설 집필
+   - 와인: 2001년부터 (와린이)
+   
+   카테고리별 도입 예시:
+   
+   [영화]
+   "영화 프로듀서로 <광해>, <하녀> 등을 제작하면서..."
+   "영화 기획개발을 하다 보니 {keyword}에 관심이..."
+   "시나리오 전공하면서 느낀 건데..."
+   
+   [여행 - 일본]
+   "도쿄에서 1년 살았고, 나가노/오키나와/교토 등 다녀왔는데..."
+   "2023년 나가노에서 스노우 몽키 보면서..."
+   "큐슈 온천 여행했을 때..."
+   
+   [여행 - 유럽]
+   "런던 체류하면서 밀라노, 피렌체, 바르셀로나 등 다녀왔는데..."
+   "프라하 맥주 투어 중에..."
+   "칸 영화제 참석했을 때..."
+   
+   [여행 - 동남아]
+   "인도네시아/베트남 공동제작 하면서 자카르타, 하노이 자주 갔는데..."
+   "2022년 세부에서 고래상어 봤을 때..."
+   "방콕 콘텐츠 엑스포 참가했을 때..."
+   
+   [와인/라이프스타일]
+   "2001년부터 와인 마셔왔는데, 전문가는 아니고 와린이 수준이에요..."
+   "주로 싼 와인만 마셔봤지만..."
+   
+   [책/소설]
+   "<감각구역> 소설 쓰면서..."
+   "시나리오 전공하다 보니..."
+   
+   [IT/일반]
+   "영화 제작 과정에서 {keyword} 관련..."
+   "개인적으로 {keyword}를 찾아보면서..."
+   
+   첫 문단에 {keyword} 1회 포함
+
+5. 본문 구조:
+   - **소제목 3-5개** (## 형식) - 2026년 최적
+   - 각 섹션 2-3문단
+   - {keyword} 전체 3-8회 자연스럽게
+   - 구어체 (~했어요, ~더라고요, ~네요)
+
+6. 경험과 의견 표현:
+   - "제 경험상 ~"
+   - "개인적으로는 ~"
+   - "저는 ~라고 생각해요"
+   - "제가 느낀 건 ~"
+
+7. 이모지 사용:
+   - 소제목에 2-3개
+   - 너무 많으면 역효과
+   - 예: 😊 💡 🎯 ✨ ⚠️
+
+8. 출처 표기:
+   뉴스 인용 시:
+   최근 OO 기사를 보니, ~하더라고요.
+   [OO 기사 보기](링크)
+
+9. 마무리:
+   여러분은 {keyword}에 대해 어떻게 생각하시나요?
+   댓글로 경험 공유해주시면 감사하겠습니다! 😊
+
+10. 태그:
+    ## 태그
+    #{keyword.replace(' ', '')} #{year} #개인후기 #경험담 #정보공유
+
+📝 작성 예시 (CINEPARK 페르소나):
+
+<영화 카테고리 - 제작 경험 활용>
+## {keyword} 영화 프로듀서가 보는 관점! {year}년 ✨
 
 안녕하세요.
 영화 프로듀서의 블로그, CINEPARK입니다.
 
-[첫 문단에 "{keyword}" 1회 포함]
-[독자 공감 유도 - 질문 또는 경험]
+<광해>, <하녀> 등을 제작하면서 {keyword}에 대해 
+많이 생각하게 되는데요, 오늘은 제 경험을 바탕으로 
+공유하려고 합니다! 😊
 
-## {keyword} 핵심 정리! ✨
-["{keyword}" 포함 + 이모지]
-[구체적 정보 2-3문단]
+## {keyword} 영화 제작 현장에서 느낀 점 💡
+영화 기획개발 하면서 알게 된 건데... [전문 경험 2-3문단]
 
-뉴스 내용 언급 시:
-최근 OO신문 보도에 따르면, AI 기술이 발전하고 있습니다.
-[OO신문 기사 보기](링크)
+<국제 영화 - 공동제작 경험>
+## {keyword} 국제 공동제작 경험담! {year}년 ✨
 
-이런 식으로 문장 끝난 후 한 줄 바꿔서 링크 삽입
+안녕하세요.
+영화 프로듀서의 블로그, CINEPARK입니다.
 
-## {keyword} 선택 방법은? 🤔
-["{keyword}" 포함 + 이모지]
-[실용적 팁 2-3문단]
+인도네시아, 베트남, 일본에서 <수상한 그녀> 리메이크 등 
+공동제작 하면서 {keyword}에 대해... [국제 경험 2-3문단]
 
-## {keyword} 활용 꿀팁! 💡
-["{keyword}" 포함 + 이모지]
-[실전 예시 2-3문단]
+<여행 - 일본>
+## {keyword} 일본 여행 경험담! {year}년 ✨
 
-## {keyword} 주의사항 ⚠️
-["{keyword}" 포함 + 이모지]
-[주의점 2-3문단]
+안녕하세요.
+영화 프로듀서의 블로그, CINEPARK입니다.
 
-[마무리 + 댓글 유도]
-"여러분은 어떻게 생각하세요? 댓글로 경험 공유해주세요!"
+도쿄에서 1년 살았고, 2023년 나가노에서 스노우 몽키도 봤는데요,
+{keyword}에 대해 제 경험 공유합니다! 😊
+
+## {keyword} 나가노/교토/오키나와 다녀온 후기 💡
+큐슈 온천 여행했을 때 느낀 건데... [실제 여행 경험 2-3문단]
+
+<여행 - 유럽>
+## {keyword} 유럽 살면서 느낀 점! {year}년 ✨
+
+안녕하세요.
+영화 프로듀서의 블로그, CINEPARK입니다.
+
+런던에서 1년 살면서 밀라노, 피렌체, 바르셀로나 등 
+여행했는데요, {keyword}에 대해... [유럽 체류 경험 2-3문단]
+
+## {keyword} 프라하 맥주 투어 중 느낀 점 💡
+2016년 프라하/빈/부다페스트 다녀왔을 때... [구체적 경험 2-3문단]
+
+<여행 - 동남아>
+## {keyword} 동남아 출장/여행 꿀팁! {year}년 ✨
+
+안녕하세요.
+영화 프로듀서의 블로그, CINEPARK입니다.
+
+영화 공동제작으로 자카르타, 하노이 자주 가는데요,
+2022년 세부에서 고래상어 봤을 때 {keyword}에 대해... 😊
+
+## {keyword} 방콕/발리/세부 경험담 💡
+방콕 콘텐츠 엑스포 참가했을 때... [현지 경험 2-3문단]
+
+<와인/라이프스타일>
+## {keyword} 와린이가 알아본 정보! {year}년 ✨
+
+안녕하세요.
+영화 프로듀서의 블로그, CINEPARK입니다.
+
+2001년부터 와인 마셔왔는데, 전문가는 아니고 
+와린이 수준이에요. {keyword}에 대해 알아봤습니다! 😊
+
+## {keyword} 주로 싼 와인 마신 경험으로 💡
+전문가들 많으시니 제 경험만... [솔직한 후기 2-3문단]
+
+<책/시나리오>
+## {keyword} 작가 관점에서! {year}년 ✨
+
+안녕하세요.
+영화 프로듀서의 블로그, CINEPARK입니다.
+
+<감각구역> 소설 쓰면서, 시나리오 전공하면서 
+{keyword}에 대해 느낀 점을... 😊
+
+여러분은 {keyword}에 대해 어떻게 생각하시나요? 
+댓글로 경험 공유해주시면 감사하겠습니다!
 
 ## 태그
-#{keyword} #{year} #최신 #추천 #후기 #팁 #정보 #꿀팁 #리뷰 #가이드
+#{keyword.replace(' ', '')} #{year} #영화프로듀서 #여행경험 #현장후기
 
-⚠️ 체크리스트 (반드시 확인):
-✅ 제목에 "{keyword}" 포함
-✅ 제목 25-35자
-✅ 첫 인사: "안녕하세요." (줄바꿈) "영화 프로듀서의 블로그, CINEPARK입니다."
-✅ 본문 {word_count}자 이상
-✅ "{keyword}" 7-9회 사용
-✅ 소제목 4-5개 (##)
-✅ 이모지 5-7개
-✅ 뉴스 링크는 문장 끝 후 한 줄 띄고 [기사 보기](링크) 형식
-✅ "## 태그" 섹션 + #{keyword} 포함 10개
-
-지금 바로 SEO 90점 이상 글을 작성하세요!"""
+⚠️ CINEPARK 페르소나 핵심:
+- 영화 제작 현장 경험 (광해, 하녀, 수상한그녀 리메이크 등)
+- 국제 공동제작 경험 (인도네시아, 베트남, 일본)
+- 25개국 이상 여행 경험 (런던/도쿄 체류, 유럽/아시아 다수)
+- 시나리오 전공, 소설가 (감각구역)
+- 와린이 (2001년~, 비전문가 관점)
+- 진솔하고 구체적인 개인 경험 중심!"""
         
         message = client.messages.create(
             model="claude-sonnet-4-20250514",
@@ -404,6 +685,9 @@ def generate_optimized_post(keyword, category, word_count, claude_api_key, use_t
         )
         
         generated_content = message.content[0].text
+        
+        # SEO 자동 최적화 트리거 적용
+        generated_content = apply_seo_triggers(generated_content, keyword, year)
         
         title_match = re.search(r'##\s*(.+?)(?:\n|$)', generated_content)
         title = title_match.group(1).strip() if title_match else keyword
@@ -425,35 +709,37 @@ def generate_optimized_post(keyword, category, word_count, claude_api_key, use_t
         
         score, feedback, improvements = analyze_seo(title, final_content, keyword)
         
-        if score < 85:
-            # 상세한 개선 지침 생성
-            retry_prompt = f"""❌ 현재 SEO 점수: {score}점 (목표: 90점 이상)
+        if score < 70:
+            # 더 구체적이고 명확한 재작성 프롬프트
+            retry_prompt = f"""❌ SEO 점수 {score}점 - 목표 85점 이상 필요
 
-🔧 필수 개선사항:
+다음 형식을 정확히 따라 다시 작성하세요:
+
+## {keyword} [관련 제목] {year}년 최신판 ✨
+
+안녕하세요.
+영화 프로듀서의 블로그, CINEPARK입니다.
+
+{keyword}에 대해 궁금하신가요? [공감 유도 문장]
+
+## {keyword} 핵심 정리 💡
+{keyword}의 가장 중요한 포인트는... [2-3문단, {keyword} 1-2회 사용]
+
+## {keyword} 실전 활용법 🎯  
+실제로 {keyword}를 어떻게 활용할까요? [2-3문단, {keyword} 1-2회 사용]
+
+## {keyword} 주의사항 ⚠️
+{keyword} 사용 시 주의할 점... [2-3문단, {keyword} 1회 사용]
+
+여러분은 어떻게 생각하세요? 댓글로 경험 공유해주세요!
+
+## 태그
+#{keyword.replace(' ', '')} #{year} #최신 #추천 #정보
+
+개선사항:
 {chr(10).join([f"- {imp}" for imp in improvements])}
 
-📋 SEO 90점 체크리스트 (반드시 확인):
-
-1. 제목 체크:
-   ✅ "{keyword}" 키워드 포함 (정확히)
-   ✅ 25-35자 길이
-   ✅ 숫자 포함 (5가지, 10분 등)
-
-2. 키워드 밀도:
-   ✅ "{keyword}" 정확히 7-9회 반복
-   ✅ 첫 문단에 1회
-   ✅ 각 소제목 근처에 1회씩
-
-3. 구조:
-   ✅ 소제목(##) 4-5개
-   ✅ 이모지 5-7개 (😊 👍 ✨ 💡 🔥)
-   ✅ 반드시 "## 태그" 섹션 추가
-
-4. 태그:
-   ✅ #{keyword} 포함한 해시태그 10개
-   ✅ 예: #{keyword} #2026 #최신 #추천 #후기 #팁 #정보 #꿀팁 #리뷰 #가이드
-
-⚠️ 위 체크리스트를 100% 충족하여 다시 작성하세요!"""
+⚠️ 위 형식을 정확히 지켜서 작성하세요!"""
             
             retry_message = client.messages.create(
                 model="claude-sonnet-4-20250514",
@@ -467,6 +753,10 @@ def generate_optimized_post(keyword, category, word_count, claude_api_key, use_t
             )
             
             generated_content = retry_message.content[0].text
+            
+            # 재작성 후에도 SEO 트리거 적용
+            generated_content = apply_seo_triggers(generated_content, keyword, year)
+            
             title_match = re.search(r'##\s*(.+?)(?:\n|$)', generated_content)
             title = title_match.group(1).strip() if title_match else keyword
             
@@ -703,6 +993,37 @@ with st.expander("⚙️ API 설정", expanded=False):
             placeholder="hf_xxxxx",
             help="huggingface.co에서 무료 발급"
         )
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # GitHub 저장 설정 안내
+    github_configured = False
+    try:
+        if hasattr(st, 'secrets') and "GITHUB_TOKEN" in st.secrets and "GITHUB_OWNER" in st.secrets:
+            github_configured = True
+            st.success("✅ GitHub 저장 기능 활성화")
+    except:
+        pass
+    
+    if not github_configured:
+        with st.expander("📤 GitHub 자동 저장 설정 방법 (선택)", expanded=False):
+            st.markdown("""
+**Streamlit Cloud Secrets에 다음 정보 추가:**
+
+```toml
+GITHUB_TOKEN = "ghp_xxxxx"  # GitHub Personal Access Token
+GITHUB_OWNER = "your-username"  # GitHub 사용자명
+GITHUB_REPO = "AutoPost"  # 저장소 이름 (기본: AutoPost)
+```
+
+**GitHub Token 발급:**
+1. GitHub → Settings → Developer settings → Personal access tokens
+2. Generate new token (classic)
+3. repo 권한 체크
+4. 생성된 토큰 복사
+
+작성한 글이 `your-repo/posts/` 폴더에 자동 저장됩니다!
+""")
 
 st.markdown("<br><br>", unsafe_allow_html=True)
 
@@ -741,11 +1062,14 @@ with st.expander("📎 참고 자료 URL 추가 (선택)", expanded=False):
 
 word_count = st.slider("목표 글자수", 1500, 3000, 2000, 100)
 
-col_opt1, col_opt2 = st.columns(2)
+col_opt1, col_opt2, col_opt3 = st.columns(3)
 with col_opt1:
     include_image = st.checkbox("AI 이미지 생성", value=True)
 with col_opt2:
     use_trends = st.checkbox("최신 트렌드 반영", value=True)
+with col_opt3:
+    st.markdown("**SEO 자동 최적화** ✅")
+    st.caption("항상 활성화됨")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -869,11 +1193,28 @@ if st.button("생성하기", type="primary"):
                 else:
                     st.info("최신 뉴스를 찾을 수 없습니다.")
             
-            st.download_button(
-                "💾 다운로드",
-                result['content'],
-                file_name=f"post_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-            )
+            col_save1, col_save2 = st.columns(2)
+            with col_save1:
+                st.download_button(
+                    "💾 다운로드",
+                    result['content'],
+                    file_name=f"post_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+                )
+            with col_save2:
+                if st.button("📤 GitHub에 저장", key="save_to_github_main"):
+                    with st.spinner("GitHub에 업로드 중..."):
+                        github_result = save_to_github(
+                            result['content'],
+                            result['title'],
+                            keyword,
+                            result['seo_score']
+                        )
+                        if github_result['success']:
+                            st.success(github_result['message'])
+                            if 'url' in github_result:
+                                st.markdown(f"🔗 [GitHub에서 보기]({github_result['url']})")
+                        else:
+                            st.error(github_result['message'])
 
 # 작성 히스토리
 st.markdown("---")
