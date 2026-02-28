@@ -79,7 +79,7 @@ def recommend_keywords(category, claude_api_key):
 조건:
 1. 월 검색량: 1,000~10,000 (너무 경쟁 치열하지 않음)
 2. 경쟁 문서: 100개 이하 (상위 노출 가능)
-3. 2026년 2월 28일 현재 트렌드 반영
+3. 2026년 2월 현재 트렌드 반영
 4. 롱테일 키워드 포함 (3-5단어)
 
 출력 형식:
@@ -133,6 +133,39 @@ def search_latest_trends(keyword):
         return []
     except:
         return []
+
+# URL 내용 가져오기
+def fetch_url_content(url):
+    """사용자가 제공한 URL의 텍스트 내용 가져오기"""
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # script, style 태그 제거
+            for tag in soup(['script', 'style', 'nav', 'footer', 'header']):
+                tag.decompose()
+            
+            # 본문 추출 (p 태그 우선)
+            paragraphs = soup.find_all('p')
+            if paragraphs:
+                text = '\n'.join([p.get_text().strip() for p in paragraphs[:10]])
+            else:
+                text = soup.get_text()
+            
+            # 정리
+            lines = [line.strip() for line in text.split('\n') if line.strip()]
+            clean_text = '\n'.join(lines[:30])  # 최대 30줄
+            
+            return clean_text[:2000] if clean_text else None  # 최대 2000자
+        return None
+    except Exception as e:
+        return None
 
 # SEO 분석
 def analyze_seo(title, content, keyword):
@@ -206,11 +239,33 @@ def analyze_seo(title, content, keyword):
     return score, feedback, improvements
 
 # 올인원 자동 생성
-def generate_optimized_post(keyword, category, word_count, claude_api_key, use_trends=True):
+def generate_optimized_post(keyword, category, word_count, claude_api_key, use_trends=True, custom_urls=None):
     try:
         client = anthropic.Anthropic(api_key=claude_api_key)
         
         trend_info = ""
+        
+        # 사용자 제공 URL 처리
+        if custom_urls:
+            url_contents = []
+            for url in custom_urls:
+                content = fetch_url_content(url)
+                if content:
+                    url_contents.append(f"📎 {url}\n{content[:500]}...")
+            
+            if url_contents:
+                trend_info += f"""
+
+📎 사용자가 제공한 참고 자료:
+{chr(10).join(url_contents)}
+
+위 자료를 참고하되, 다음 규칙을 지키세요:
+1. 내용을 그대로 복사하지 말고 자신의 언어로 재구성
+2. 출처를 명시 (예: "최근 보도에 따르면", "관련 자료에 의하면")
+3. 핵심 정보만 추출하여 활용
+"""
+        
+        # Google News 트렌드
         if use_trends:
             trends = search_latest_trends(keyword)
             if trends:
@@ -643,6 +698,14 @@ with col_rec1:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
+# 참고 URL 입력 (선택)
+with st.expander("📎 참고 자료 URL 추가 (선택)", expanded=False):
+    st.markdown("**글 작성에 참고할 뉴스나 기사 URL을 입력하세요** (최대 3개)")
+    url1 = st.text_input("URL 1", placeholder="https://example.com/article1", key="url1")
+    url2 = st.text_input("URL 2", placeholder="https://example.com/article2", key="url2")
+    url3 = st.text_input("URL 3", placeholder="https://example.com/article3", key="url3")
+    st.info("💡 입력한 URL의 내용을 AI가 자동으로 읽고 참고합니다.")
+
 word_count = st.slider("목표 글자수", 1500, 3000, 2000, 100)
 
 col_opt1, col_opt2 = st.columns(2)
@@ -661,15 +724,25 @@ if st.button("생성하기", type="primary"):
     elif not keyword:
         st.error("⚠️ 키워드를 입력해주세요")
     else:
+        # 입력된 URL 수집
+        custom_urls = []
+        for url_input in [url1, url2, url3]:
+            if url_input and url_input.startswith('http'):
+                custom_urls.append(url_input)
+        
         progress = st.progress(0)
         status = st.empty()
         
-        status.text("제목 최적화 중...")
-        progress.progress(33)
-        status.text("본문 생성 중...")
-        progress.progress(66)
+        if custom_urls:
+            status.text(f"참고 자료 {len(custom_urls)}개 읽는 중...")
+            progress.progress(20)
         
-        result = generate_optimized_post(keyword, category, word_count, claude_key, use_trends)
+        status.text("제목 최적화 중...")
+        progress.progress(40)
+        status.text("본문 생성 중...")
+        progress.progress(70)
+        
+        result = generate_optimized_post(keyword, category, word_count, claude_key, use_trends, custom_urls)
         
         status.text("SEO 분석 중...")
         progress.progress(100)
@@ -736,6 +809,13 @@ if st.button("생성하기", type="primary"):
             
             st.markdown("### 📄 생성된 글")
             st.markdown(result['content'])
+            
+            # 참고한 URL 표시
+            if custom_urls:
+                st.markdown("---")
+                st.markdown("### 📎 참고한 자료")
+                for i, url in enumerate(custom_urls, 1):
+                    st.markdown(f"{i}. [{url}]({url})")
             
             # 뉴스 출처는 글 아래에 표시
             if use_trends:
