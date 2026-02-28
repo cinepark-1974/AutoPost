@@ -4,9 +4,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-env/
-venv/
-ENV/
 build/
 develop-eggs/
 dist/
@@ -23,13 +20,15 @@ wheels/
 .installed.cfg
 *.egg
 
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv/
+
 # Streamlit
 .streamlit/secrets.toml
-
-# API Keys & Secrets
-.env
-*.key
-*.secret
+post_history.json
 
 # IDE
 .vscode/
@@ -42,8 +41,10 @@ wheels/
 .DS_Store
 Thumbs.db
 
+# Secrets (중요!)
+secrets.toml
+*.env
+.env
+
 # Logs
 *.log
-
-# Generated images (선택사항 - 이미지 저장하려면 주석 처리)
-# generated_images/
