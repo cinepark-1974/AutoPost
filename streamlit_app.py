@@ -4,6 +4,44 @@ import requests
 from datetime import datetime
 import json
 import re
+import os
+from pathlib import Path
+
+# 히스토리 파일 경로
+HISTORY_FILE = Path("/home/claude/post_history.json")
+
+# 히스토리 불러오기
+def load_history():
+    """히스토리 파일에서 불러오기"""
+    try:
+        if HISTORY_FILE.exists():
+            with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                # timestamp를 datetime으로 변환
+                for item in data:
+                    if isinstance(item['timestamp'], str):
+                        item['timestamp'] = datetime.fromisoformat(item['timestamp'])
+                return data
+    except:
+        pass
+    return []
+
+# 히스토리 저장하기
+def save_history(history):
+    """히스토리를 파일로 저장"""
+    try:
+        # datetime을 string으로 변환
+        data = []
+        for item in history:
+            item_copy = item.copy()
+            if isinstance(item_copy['timestamp'], datetime):
+                item_copy['timestamp'] = item_copy['timestamp'].isoformat()
+            data.append(item_copy)
+        
+        with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        st.error(f"히스토리 저장 실패: {str(e)}")
 
 # 상수
 BOOK_INFO = {
@@ -41,7 +79,7 @@ def recommend_keywords(category, claude_api_key):
 조건:
 1. 월 검색량: 1,000~10,000 (너무 경쟁 치열하지 않음)
 2. 경쟁 문서: 100개 이하 (상위 노출 가능)
-3. 2026년 2월 현재 트렌드 반영
+3. 2026년 현재 트렌드 반영
 4. 롱테일 키워드 포함 (3-5단어)
 
 출력 형식:
@@ -199,68 +237,76 @@ def generate_optimized_post(keyword, category, word_count, claude_api_key, use_t
 목표 글자수: {word_count}자
 {trend_info}
 
-📋 필수 원칙:
+🎯 SEO 점수 90점 이상 필수 조건:
 
-1. 정확성 (최우선):
-   - 확실한 정보만 작성
-   - 추측이나 과장 금지
-   - 출처 불명확하면 "~라는 의견도 있어요" 등으로 조심스럽게 표현
-   - 최신 트렌드 정보가 있다면 자연스럽게 언급
-
-2. 방문자 증가 전략:
-   - 제목: 클릭 유도 + 구체적 (25-35자)
+1. 제목 (30점):
+   - 반드시 "{keyword}" 포함 (정확히)
+   - 25-35자 길이 엄수
    - 숫자 활용 (5가지, 10분, 2026년)
-   - 감탄사 (꿀팁, 대박, 놀라운, 진짜)
-   - 키워드 "{keyword}" 제목 앞쪽 배치
+   - 예: "{keyword} 완벽 가이드! 2026년 최신 5가지"
 
-3. 본문 작성:
-   - 첫 문장: "안녕하세요. 영화 프로듀서의 블로그, CINEPARK입니다."
-   - 도입: 독자 공감 유도 (질문 또는 경험)
-   - 본문: 실용적 정보 + 구체적 예시
-   - "{keyword}" 5-7회 자연스럽게 포함
-   - 소제목 3-5개 (물음표? 또는 느낌표!)
-   - 각 소제목마다 실전 팁 포함
-   - 개인 경험이나 후기 느낌으로 작성
-   - 이모지 3-5개 (😊, 👍, ✨, 💡, 🔥)
-   - 친근한 블로그 말투 (~했어요, ~더라고요, ~네요)
-   - **뉴스 내용 언급 시 반드시 출처 표기**
-     예: "최근 OO신문 보도에 따르면...", "OO매체에서 발표한 자료에 의하면..."
-
-4. SEO 최적화:
-   - 첫 문단에 키워드 포함
-   - 소제목에 키워드 관련어
+2. 키워드 밀도 (30점):
+   - "{keyword}" 정확히 7-9회 반복
+   - 첫 문단에 1회 필수
+   - 각 소제목에 관련 단어 포함
    - 본문 전체에 고르게 분산
-   - 해시태그 10개
 
-5. 독자 행동 유도:
-   - 마무리에 질문 또는 댓글 유도
-   - "여러분은 어떻게 생각하세요?"
-   - "댓글로 경험 공유해주세요!"
+3. 소제목 (20점):
+   - ## 형식으로 4-5개 필수
+   - 각 소제목은 물음표(?) 또는 느낌표(!)로 끝
+   - 예: "## {keyword} 선택 방법은?"
 
-6. 글자수: 반드시 {word_count}자 이상
+4. 이모지 (10점):
+   - 본문에 정확히 5-7개 삽입
+   - 추천: 😊 👍 ✨ 💡 🔥 ⭐ 📌
+   - 각 소제목 또는 주요 포인트에 배치
 
-출력 형식:
-## [클릭 유도 제목]
+5. 해시태그 (10점):
+   - 반드시 "## 태그" 섹션 추가
+   - #{keyword} 포함하여 10개 작성
+   - 예: #{keyword} #2026 #최신 #추천 #후기 #팁 #정보 #꿀팁 #리뷰 #가이드
+
+📋 필수 구조:
+
+## [{keyword} 관련 제목 25-35자]
 
 안녕하세요. 영화 프로듀서의 블로그, CINEPARK입니다.
 
-[공감되는 도입 - 질문 또는 경험]
+[첫 문단에 "{keyword}" 1회 포함]
+[독자 공감 유도 - 질문 또는 경험]
 
-## [실용적인 소제목1]?
-[구체적인 정보 + 팁]
+## {keyword} 핵심 정리! ✨
+["{keyword}" 포함 + 이모지]
+[구체적 정보 2-3문단]
 
-## [흥미로운 소제목2]!
-[실전 예시 + 경험]
+## {keyword} 선택 방법은? 🤔
+["{keyword}" 포함 + 이모지]
+[실용적 팁 2-3문단]
 
-## [도움되는 소제목3]?
-[추가 정보 + 조언]
+## {keyword} 활용 꿀팁! 💡
+["{keyword}" 포함 + 이모지]
+[실전 예시 2-3문단]
+
+## {keyword} 주의사항 ⚠️
+["{keyword}" 포함 + 이모지]
+[주의점 2-3문단]
 
 [마무리 + 댓글 유도]
+"여러분은 어떻게 생각하세요? 댓글로 경험 공유해주세요!"
 
 ## 태그
 #{keyword} #2026 #최신 #추천 #후기 #팁 #정보 #꿀팁 #리뷰 #가이드
 
-지금 바로 독자들이 열광할 글을 작성하세요!"""
+⚠️ 체크리스트 (반드시 확인):
+✅ 제목에 "{keyword}" 포함
+✅ 제목 25-35자
+✅ 본문 {word_count}자 이상
+✅ "{keyword}" 7-9회 사용
+✅ 소제목 4-5개 (##)
+✅ 이모지 5-7개
+✅ "## 태그" 섹션 + #{keyword} 포함 10개
+
+지금 바로 SEO 90점 이상 글을 작성하세요!"""
         
         message = client.messages.create(
             model="claude-sonnet-4-20250514",
@@ -291,13 +337,35 @@ def generate_optimized_post(keyword, category, word_count, claude_api_key, use_t
         
         score, feedback, improvements = analyze_seo(title, final_content, keyword)
         
-        if score < 80:
-            retry_prompt = f"""SEO {score}점입니다. 개선해서 다시:
+        if score < 85:
+            # 상세한 개선 지침 생성
+            retry_prompt = f"""❌ 현재 SEO 점수: {score}점 (목표: 90점 이상)
 
-{chr(10).join(improvements)}
+🔧 필수 개선사항:
+{chr(10).join([f"- {imp}" for imp in improvements])}
 
-키워드: {keyword}
-목표: 80점 이상"""
+📋 SEO 90점 체크리스트 (반드시 확인):
+
+1. 제목 체크:
+   ✅ "{keyword}" 키워드 포함 (정확히)
+   ✅ 25-35자 길이
+   ✅ 숫자 포함 (5가지, 10분 등)
+
+2. 키워드 밀도:
+   ✅ "{keyword}" 정확히 7-9회 반복
+   ✅ 첫 문단에 1회
+   ✅ 각 소제목 근처에 1회씩
+
+3. 구조:
+   ✅ 소제목(##) 4-5개
+   ✅ 이모지 5-7개 (😊 👍 ✨ 💡 🔥)
+   ✅ 반드시 "## 태그" 섹션 추가
+
+4. 태그:
+   ✅ #{keyword} 포함한 해시태그 10개
+   ✅ 예: #{keyword} #2026 #최신 #추천 #후기 #팁 #정보 #꿀팁 #리뷰 #가이드
+
+⚠️ 위 체크리스트를 100% 충족하여 다시 작성하세요!"""
             
             retry_message = client.messages.create(
                 model="claude-sonnet-4-20250514",
@@ -382,7 +450,17 @@ st.set_page_config(
 
 # 세션 상태 초기화
 if 'post_history' not in st.session_state:
-    st.session_state['post_history'] = []
+    # 파일에서 불러오기 시도
+    loaded_history = load_history()
+    if loaded_history:
+        st.session_state['post_history'] = loaded_history
+    else:
+        # 빈 리스트로 시작
+        st.session_state['post_history'] = []
+
+# 디버그: 히스토리 개수 표시 (개발용)
+if st.session_state['post_history']:
+    st.sidebar.success(f"✅ 저장된 글: {len(st.session_state['post_history'])}개")
 
 # CSS
 st.markdown("""
@@ -403,12 +481,28 @@ st.markdown("""
     
     /* 버튼 */
     .stButton > button[kind="primary"] {
-        background: #191970 !important; color: white !important; font-weight: 600 !important;
-        border: none !important; padding: 0.75rem 2rem !important; border-radius: 8px !important;
-        width: 100% !important; font-size: 1rem !important;
+        background: #191970 !important; 
+        color: #ffffff !important; 
+        font-weight: 600 !important;
+        border: none !important; 
+        padding: 0.75rem 2rem !important; 
+        border-radius: 8px !important;
+        width: 100% !important; 
+        font-size: 1rem !important;
     }
     .stButton > button[kind="primary"]:hover {
-        background: #252d7a !important; box-shadow: 0 4px 12px rgba(25, 25, 112, 0.25) !important;
+        background: #252d7a !important; 
+        box-shadow: 0 4px 12px rgba(25, 25, 112, 0.25) !important;
+    }
+    
+    /* 일반 버튼 */
+    .stButton > button {
+        color: #262730 !important;
+        background: #ffffff !important;
+        border: 1px solid #e0e0e0 !important;
+    }
+    .stButton > button:hover {
+        background: #f8f9fa !important;
     }
     
     /* 입력 필드 */
@@ -600,6 +694,9 @@ if st.button("생성하기", type="primary"):
             if len(st.session_state['post_history']) > 20:
                 st.session_state['post_history'] = st.session_state['post_history'][:20]
             
+            # 파일로 저장
+            save_history(st.session_state['post_history'])
+            
             st.markdown(f"""
             <div class="seo-score">
                 <div class="score-number">{result['seo_score']}</div>
@@ -666,10 +763,10 @@ if st.button("생성하기", type="primary"):
             )
 
 # 작성 히스토리
+st.markdown("---")
+st.markdown("## 📝 작성 히스토리")
+
 if st.session_state['post_history']:
-    st.markdown("---")
-    st.markdown("## 📝 작성 히스토리")
-    
     for idx, post in enumerate(st.session_state['post_history']):
         with st.expander(
             f"**{post['title'][:50]}{'...' if len(post['title']) > 50 else ''}** "
@@ -697,7 +794,10 @@ if st.session_state['post_history']:
             with col_btn2:
                 if st.button("🗑️ 삭제", key=f"delete_{idx}"):
                     st.session_state['post_history'].pop(idx)
+                    save_history(st.session_state['post_history'])
                     st.rerun()
+else:
+    st.info("📭 아직 작성한 글이 없습니다. 위에서 키워드를 입력하고 글을 생성해보세요!")
 
 # Footer
 st.markdown("""
