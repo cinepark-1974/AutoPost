@@ -273,7 +273,7 @@ def generate_post(keyword, category, word_count, api_key):
 
 CINEPARK 배경:
 - 영화 프로듀서 (광해, 하녀 제작)
-- 25개국 여행
+- 유럽, 아시아 25개 도시 여행
 - 시나리오 전공, 소설가
 
 지금 자연스러운 블로그 글을 작성하세요!"""
