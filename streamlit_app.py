@@ -14,10 +14,17 @@ def get_trending_keywords(category="영화"):
     current_date = datetime.now()
     month = current_date.month
     year = current_date.year
+    day = current_date.day
     
     season = "봄" if month in [3,4,5] else "여름" if month in [6,7,8] else "가을" if month in [9,10,11] else "겨울"
     
-    keywords = {
+    # 날짜 기반 시드로 키워드 변경 (매일 다른 키워드)
+    import random
+    seed = year * 10000 + month * 100 + day
+    random.seed(seed)
+    
+    # 전체 키워드 풀
+    keyword_pool = {
         "영화": [
             f"{year}년 {month}월 개봉 영화 기대작",
             f"{season} 시즌 영화 추천 베스트 10",
@@ -28,7 +35,17 @@ def get_trending_keywords(category="영화"):
             "마동석 영화 전부 정리",
             "봉준호 감독 작품 순위",
             "재벌 로맨스 영화 추천 명작",
-            "두 글자 제목 영화 순위"
+            "두 글자 제목 영화 순위",
+            f"{year}년 아카데미 후보작 정리",
+            "한국 영화 감독 베스트 10",
+            "CGV 예매율 순위 실시간",
+            "메가박스 상영작 추천",
+            "롯데시네마 특별관 정리",
+            f"{season} 데이트 영화 추천",
+            "가족 영화 베스트 명작",
+            "액션 영화 역대 순위",
+            "공포 영화 추천 무서운",
+            "코미디 영화 베스트 웃긴",
         ],
         "여행": [
             f"{season} 여행지 추천 베스트",
@@ -40,7 +57,17 @@ def get_trending_keywords(category="영화"):
             "유럽 맥주 투어 추천",
             "프라하 여행 후기 꿀팁",
             "발리 여행 가이드 완벽",
-            "방콕 쇼핑 리스트 총정리"
+            "방콕 쇼핑 리스트 총정리",
+            f"{year}년 해외여행 추천",
+            "국내 여행지 숨은 명소",
+            "캠핑장 추천 베스트",
+            "서울 근교 당일치기",
+            "강원도 여행 코스",
+            "경주 여행 가이드",
+            "전주 한옥마을 맛집",
+            "여수 밤바다 여행",
+            "속초 여행 완벽 정리",
+            "태국 여행 경비 정리",
         ],
         "와인": [
             "와인 초보 추천 입문",
@@ -52,7 +79,17 @@ def get_trending_keywords(category="영화"):
             "스파클링 와인 순위",
             "레드 와인 베스트 10",
             "화이트 와인 추천 여름",
-            "와인 보관 방법 꿀팁"
+            "와인 보관 방법 꿀팁",
+            "이탈리아 와인 추천",
+            "스페인 와인 가성비",
+            "와인잔 추천 종류",
+            "와인 오프너 사용법",
+            "와인바 추천 서울",
+            "홈파티 와인 추천",
+            "선물용 와인 베스트",
+            "와인 시음 노하우",
+            "와인 투어 추천 지역",
+            "내추럴 와인 입문",
         ],
         "책": [
             f"{year}년 베스트셀러 순위",
@@ -64,7 +101,17 @@ def get_trending_keywords(category="영화"):
             "북클럽 운영 가이드",
             "전자책 vs 종이책 비교",
             "작가 되는 법 완벽 가이드",
-            "추리소설 추천 명작"
+            "추리소설 추천 명작",
+            "SF 소설 베스트 순위",
+            "에세이 추천 힐링",
+            "경제 경영서 필독서",
+            "역사책 추천 베스트",
+            "심리학 책 입문",
+            "철학 입문서 추천",
+            "시집 추천 명작",
+            "만화책 추천 완결",
+            "어린이 책 베스트",
+            "영어 원서 입문 추천",
         ],
         "IT": [
             "ChatGPT 활용법 완벽 가이드",
@@ -76,7 +123,17 @@ def get_trending_keywords(category="영화"):
             "코딩 없이 웹사이트 만들기",
             "업무 자동화 도구 추천",
             "클라우드 스토리지 비교",
-            "무료 AI 툴 베스트"
+            "무료 AI 툴 베스트",
+            "맥북 vs 윈도우 노트북",
+            "아이패드 활용 가이드",
+            "갤럭시 꿀팁 정리",
+            "크롬 확장프로그램 추천",
+            "VPN 추천 순위",
+            "백업 프로그램 비교",
+            "화상회의 툴 추천",
+            "PDF 편집 무료 프로그램",
+            "동영상 편집 앱 추천",
+            "사진 편집 프로그램",
         ],
         "일상": [
             f"{season} 라이프스타일 추천",
@@ -88,7 +145,17 @@ def get_trending_keywords(category="영화"):
             "힐링 방법 베스트",
             "자기관리 루틴",
             "생활 꿀팁 모음",
-            "취미 추천 베스트"
+            "취미 추천 베스트",
+            "명상 입문 가이드",
+            "일기 쓰기 방법",
+            "플래너 활용 꿀팁",
+            "집콕 취미 추천",
+            "홈카페 만들기",
+            "반려동물 키우기 가이드",
+            "식물 키우기 초보",
+            "캘리그라피 입문",
+            "그림 그리기 시작",
+            "악기 배우기 추천",
         ],
         "건강": [
             "홈트레이닝 루틴 추천",
@@ -100,7 +167,17 @@ def get_trending_keywords(category="영화"):
             "요가 초보 추천",
             "걷기 운동 효과",
             "건강 검진 가이드",
-            "면역력 높이는 방법"
+            "면역력 높이는 방법",
+            "근력 운동 순서",
+            "유산소 운동 추천",
+            "필라테스 효과 정리",
+            "PT 추천 가이드",
+            "단백질 섭취 방법",
+            "물 마시기 효과",
+            "금연 방법 완벽 가이드",
+            "금주 실천 노하우",
+            "스트레스 해소 방법",
+            "허리 통증 스트레칭",
         ],
         "요리": [
             f"{season} 제철 요리 레시피",
@@ -112,7 +189,17 @@ def get_trending_keywords(category="영화"):
             "주말 브런치 메뉴",
             "손님 초대 요리",
             "냉장고 파먹기 레시피",
-            "요리 도구 추천"
+            "요리 도구 추천",
+            "에어프라이어 레시피",
+            "전자레인지 요리",
+            "1인 요리 레시피",
+            "밀프렙 가이드",
+            "베이킹 입문 레시피",
+            "디저트 만들기",
+            "샐러드 레시피 모음",
+            "스무디 레시피",
+            "김치 담그는 법",
+            "장 담그기 가이드",
         ],
         "재테크": [
             f"{year}년 투자 전략",
@@ -124,7 +211,17 @@ def get_trending_keywords(category="영화"):
             "월급 관리 방법",
             "연금 준비 가이드",
             "금융 상품 비교",
-            "재무 설계 완벽 정리"
+            "재무 설계 완벽 정리",
+            "ISA 계좌 활용법",
+            "IRP 연금 가이드",
+            "코인 투자 주의사항",
+            "채권 투자 입문",
+            "배당주 추천 종목",
+            "미국 주식 시작",
+            "적금 이자 비교",
+            "예금 상품 추천",
+            "체크카드 혜택 비교",
+            "신용카드 추천 순위",
         ],
         "패션": [
             f"{season} 패션 트렌드",
@@ -136,11 +233,25 @@ def get_trending_keywords(category="영화"):
             "쇼핑몰 추천 베스트",
             "스타일링 가이드",
             "액세서리 추천",
-            "신발 추천 정리"
+            "신발 추천 정리",
+            "가방 추천 브랜드",
+            "시계 추천 순위",
+            "선글라스 고르는 법",
+            "모자 코디 방법",
+            "스카프 매는 법",
+            "향수 추천 베스트",
+            "화장품 추천 순위",
+            "스킨케어 루틴",
+            "헤어스타일 추천",
+            "네일 디자인 트렌드",
         ]
     }
     
-    return keywords.get(category, keywords["영화"])
+    # 카테고리 키워드 풀에서 랜덤 10개 선택 (날짜 기반)
+    pool = keyword_pool.get(category, keyword_pool["영화"])
+    selected = random.sample(pool, min(10, len(pool)))
+    
+    return selected
 
 # 키워드 분석
 def analyze_keyword(keyword):
@@ -273,7 +384,7 @@ def generate_post(keyword, category, word_count, api_key):
 
 CINEPARK 배경:
 - 영화 프로듀서 (광해, 하녀 제작)
-- 유럽, 아시아 25개 도시 여행
+- 25개국 여행
 - 시나리오 전공, 소설가
 
 지금 자연스러운 블로그 글을 작성하세요!"""
@@ -348,12 +459,82 @@ with st.expander("⚙️ API 설정"):
 st.markdown("---")
 
 # 트렌드 키워드
-with st.expander("🔥 트렌드 키워드 추천 (방문자 증가!)", expanded=True):
-    cat = st.selectbox("카테고리", ["영화", "여행", "와인", "책", "IT", "일상", "건강", "요리", "재테크", "패션"], key="trend_category")
+with st.expander("🔥 트렌드 키워드 추천 (AI 실시간 생성!)", expanded=True):
+    st.success("🤖 **AI 추천 방식**: 오른쪽 'AI 추천' 버튼을 누르면 Claude가 실시간으로 최신 트렌드를 분석해서 새로운 키워드 10개를 생성합니다!")
+    st.info("💎 **빠른 선택**: 버튼을 누르지 않으면 검증된 고정 키워드가 표시됩니다. (둘 다 효과적!)")
     
-    keywords = get_trending_keywords(cat)
+    col_cat, col_btn = st.columns([3, 1])
+    with col_cat:
+        cat = st.selectbox("카테고리", ["영화", "여행", "와인", "책", "IT", "일상", "건강", "요리", "재테크", "패션"], key="trend_category")
+    with col_btn:
+        st.markdown("<div style='padding-top: 1.8rem;'></div>", unsafe_allow_html=True)
+        refresh_trends = st.button("🤖 AI 추천", help="AI가 실시간으로 새로운 트렌드 키워드 생성 ($0.01)", type="primary")
     
-    st.markdown("### 💎 TOP 10")
+    # 세션에 트렌드 키워드 저장
+    cache_key = f"trend_{cat}"
+    
+    if refresh_trends or cache_key not in st.session_state:
+        api = load_api_key()
+        if api:
+            with st.spinner("AI가 최신 트렌드를 분석 중..."):
+                # Claude API로 실시간 트렌드 생성
+                try:
+                    client = anthropic.Anthropic(api_key=api)
+                    
+                    current_date = datetime.now()
+                    year = current_date.year
+                    month = current_date.month
+                    day = current_date.day
+                    
+                    season = "봄" if month in [3,4,5] else "여름" if month in [6,7,8] else "가을" if month in [9,10,11] else "겨울"
+                    
+                    prompt = f"""당신은 블로그 SEO 전문가입니다. {cat} 카테고리에서 **{year}년 {month}월 {day}일 오늘** 검색량이 높고 방문자 증가에 효과적인 트렌드 키워드 10개를 추천하세요.
+
+조건:
+- 오늘 날짜 기준 시의성 (계절: {season})
+- 검색량 1,000~10,000
+- 길이 15-30자
+- 숫자/년도 포함
+
+출력 형식:
+1. 키워드
+2. 키워드
+...
+10. 키워드
+
+지금 {cat} 트렌드 키워드 10개만 출력!"""
+                    
+                    response = client.messages.create(
+                        model="claude-sonnet-4-20250514",
+                        max_tokens=500,
+                        temperature=0.9,
+                        messages=[{"role": "user", "content": prompt}]
+                    )
+                    
+                    content = response.content[0].text
+                    keywords = []
+                    for line in content.split('\n'):
+                        line = line.strip()
+                        if line and any(line.startswith(f"{i}.") for i in range(1, 11)):
+                            kw = line.split('.', 1)[1].strip()
+                            keywords.append(kw)
+                    
+                    if len(keywords) >= 10:
+                        st.session_state[cache_key] = keywords[:10]
+                        st.success("✅ 최신 트렌드 키워드 생성 완료!")
+                    else:
+                        st.session_state[cache_key] = get_trending_keywords(cat)
+                        st.info("백업 키워드 사용")
+                        
+                except Exception as e:
+                    st.session_state[cache_key] = get_trending_keywords(cat)
+                    st.warning("백업 키워드 사용")
+        else:
+            st.session_state[cache_key] = get_trending_keywords(cat)
+    
+    keywords = st.session_state.get(cache_key, get_trending_keywords(cat))
+    
+    st.markdown("### 💎 오늘의 TOP 10")
     
     cols = st.columns(2)
     for idx, kw in enumerate(keywords):
@@ -435,3 +616,4 @@ if st.session_state['post_history']:
     for idx, post in enumerate(st.session_state['post_history'][:5]):
         with st.expander(f"{post['title'][:40]}... ({post['seo_score']}점)"):
             st.markdown(post['content'])
+
