@@ -349,7 +349,7 @@ st.markdown("---")
 
 # 트렌드 키워드
 with st.expander("🔥 트렌드 키워드 추천 (방문자 증가!)", expanded=True):
-    cat = st.selectbox("카테고리", ["영화", "여행", "와인", "책", "IT", "일상", "건강", "요리", "재테크", "패션"])
+    cat = st.selectbox("카테고리", ["영화", "여행", "와인", "책", "IT", "일상", "건강", "요리", "재테크", "패션"], key="trend_category")
     
     keywords = get_trending_keywords(cat)
     
@@ -376,7 +376,7 @@ col1, col2 = st.columns([2, 1])
 with col1:
     keyword = st.text_input("키워드", value=st.session_state.get('sel_kw', ''))
 with col2:
-    category = st.selectbox("카테고리", ["영화", "여행", "와인", "책", "IT", "일상", "건강", "요리", "재테크", "패션"])
+    category = st.selectbox("카테고리", ["영화", "여행", "와인", "책", "IT", "일상", "건강", "요리", "재테크", "패션"], key="main_category")
 
 word_count = st.slider("글자수", 1500, 3000, 2000)
 
