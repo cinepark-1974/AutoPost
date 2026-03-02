@@ -376,16 +376,26 @@ def generate_post(keyword, category, word_count, api_key):
 
 필수 규칙:
 1. 제목 28-32자 (키워드 자연스럽게 포함)
-2. 인사: "안녕하세요. 영화 프로듀서의 블로그, CINEPARK입니다."
-3. 구어체: ~더라고요, ~거든요, ~이에요
+
+2. 인사 (반드시 줄바꿈):
+안녕하세요.
+영화 프로듀서의 블로그, CINEPARK입니다.
+
+3. 구어체: ~더라고요, ~거든요, ~이에요, ~합니다, ~입니다
+   - 다양하게 섞어서 사용
+   - 너무 한 가지만 반복하지 말 것
+
 4. 소제목 3-5개
+
 5. 키워드 3-8회
+
 6. 태그 섹션 포함
 
-CINEPARK 배경:
-- 영화 프로듀서 (광해, 하녀 제작)
-- 25개국 여행
-- 시나리오 전공, 소설가
+CINEPARK 배경 (정확한 사실):
+- 영화 프로듀서 (광해, 하녀 투자)
+- 유럽, 아시아 25개 도시 여행
+- 콘텐츠 시나리오 전공
+- 소설 '감각구역' 작가 (교보문고 e-북)
 
 지금 자연스러운 블로그 글을 작성하세요!"""
         
@@ -616,4 +626,3 @@ if st.session_state['post_history']:
     for idx, post in enumerate(st.session_state['post_history'][:5]):
         with st.expander(f"{post['title'][:40]}... ({post['seo_score']}점)"):
             st.markdown(post['content'])
-
