@@ -470,35 +470,113 @@ st.markdown("---")
 
 # 트렌드 키워드
 with st.expander("🔥 트렌드 키워드 추천 (AI 실시간 생성!)", expanded=True):
-    st.success("🤖 **AI 추천 방식**: 오른쪽 'AI 추천' 버튼을 누르면 Claude가 실시간으로 최신 트렌드를 분석해서 새로운 키워드 10개를 생성합니다!")
-    st.info("💎 **빠른 선택**: 버튼을 누르지 않으면 검증된 고정 키워드가 표시됩니다. (둘 다 효과적!)")
     
-    col_cat, col_btn = st.columns([3, 1])
-    with col_cat:
-        cat = st.selectbox("카테고리", ["영화", "여행", "와인", "책", "IT", "일상", "건강", "요리", "재테크", "패션"], key="trend_category")
-    with col_btn:
-        st.markdown("<div style='padding-top: 1.8rem;'></div>", unsafe_allow_html=True)
-        refresh_trends = st.button("🤖 AI 추천", help="AI가 실시간으로 새로운 트렌드 키워드 생성 ($0.01)", type="primary")
+    tab1, tab2, tab3 = st.tabs(["📰 실시간 뉴스", "💎 검증된 키워드", "🤖 AI 맞춤 추천"])
     
-    # 세션에 트렌드 키워드 저장
-    cache_key = f"trend_{cat}"
-    
-    if refresh_trends or cache_key not in st.session_state:
-        api = load_api_key()
-        if api:
-            with st.spinner("AI가 최신 트렌드를 분석 중..."):
-                # Claude API로 실시간 트렌드 생성
+    with tab1:
+        st.success("📰 **Google News 실시간 트렌드**: 지금 이 순간 화제인 뉴스를 블로그 키워드로 변환!")
+        
+        news_cat = st.selectbox(
+            "뉴스 카테고리", 
+            ["전체 뉴스", "정치", "경제", "사회", "국제", "연예", "스포츠", "IT과학"],
+            key="news_category"
+        )
+        
+        if st.button("📡 실시간 뉴스 가져오기", type="primary", key="fetch_news"):
+            with st.spinner("Google News에서 최신 뉴스 검색 중..."):
                 try:
-                    client = anthropic.Anthropic(api_key=api)
+                    # 카테고리별 검색어
+                    search_map = {
+                        "전체 뉴스": "",
+                        "정치": "정치",
+                        "경제": "경제",
+                        "사회": "사회",
+                        "국제": "국제",
+                        "연예": "연예",
+                        "스포츠": "스포츠",
+                        "IT과학": "기술"
+                    }
                     
-                    current_date = datetime.now()
-                    year = current_date.year
-                    month = current_date.month
-                    day = current_date.day
+                    search_term = search_map.get(news_cat, "")
+                    url = f"https://news.google.com/rss/search?q={search_term}&hl=ko&gl=KR&ceid=KR:ko" if search_term else "https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko"
                     
-                    season = "봄" if month in [3,4,5] else "여름" if month in [6,7,8] else "가을" if month in [9,10,11] else "겨울"
+                    response = requests.get(url, timeout=10)
                     
-                    prompt = f"""당신은 블로그 SEO 전문가입니다. {cat} 카테고리에서 **{year}년 {month}월 {day}일 오늘** 검색량이 높고 방문자 증가에 효과적인 트렌드 키워드 10개를 추천하세요.
+                    if response.status_code == 200:
+                        import xml.etree.ElementTree as ET
+                        root = ET.fromstring(response.content)
+                        
+                        news_list = []
+                        for item in root.findall('.//item')[:10]:
+                            title = item.find('title').text if item.find('title') is not None else ""
+                            source = item.find('source').text if item.find('source') is not None else ""
+                            
+                            if title:
+                                # 출처 제거하고 깔끔한 제목만
+                                clean_title = title.split(' - ')[0].strip()
+                                news_list.append({
+                                    'title': clean_title,
+                                    'source': source
+                                })
+                        
+                        if news_list:
+                            st.success(f"✅ 최신 {news_cat} 트렌드 {len(news_list)}개")
+                            
+                            cols = st.columns(2)
+                            for idx, news in enumerate(news_list):
+                                with cols[idx % 2]:
+                                    # 키워드로 변환 (블로그 제목 형식)
+                                    blog_keyword = f"{news['title']} 총정리" if len(news['title']) < 20 else news['title']
+                                    
+                                    if st.button(
+                                        f"🔥 {blog_keyword}", 
+                                        key=f"news_{idx}", 
+                                        use_container_width=True
+                                    ):
+                                        st.session_state['sel_kw'] = blog_keyword
+                                        st.rerun()
+                                    
+                                    st.caption(f"출처: {news['source']}")
+                        else:
+                            st.warning("뉴스를 가져오지 못했습니다.")
+                    else:
+                        st.error("뉴스 로드 실패")
+                        
+                except Exception as e:
+                    st.error(f"오류: {str(e)}")
+        
+        st.info("💡 **장점**: 미국-이란 전쟁, 최신 정치 이슈 등 실시간 반영! 검색 유입 폭발적!")
+    
+    with tab2:
+        st.success("🤖 **AI 추천 방식**: 오른쪽 'AI 추천' 버튼을 누르면 Claude가 실시간으로 최신 트렌드를 분석해서 새로운 키워드 10개를 생성합니다!")
+        st.info("💎 **빠른 선택**: 버튼을 누르지 않으면 검증된 고정 키워드가 표시됩니다. (둘 다 효과적!)")
+        
+        col_cat, col_btn = st.columns([3, 1])
+        with col_cat:
+            cat = st.selectbox("카테고리", ["영화", "여행", "와인", "책", "IT", "일상", "건강", "요리", "재테크", "패션"], key="trend_category")
+        with col_btn:
+            st.markdown("<div style='padding-top: 1.8rem;'></div>", unsafe_allow_html=True)
+            refresh_trends = st.button("🤖 AI 추천", help="AI가 실시간으로 새로운 트렌드 키워드 생성 ($0.01)", type="primary")
+        
+        # 세션에 트렌드 키워드 저장
+        cache_key = f"trend_{cat}"
+        
+        if refresh_trends or cache_key not in st.session_state:
+            api = load_api_key()
+            if api:
+                with st.spinner("AI가 최신 트렌드를 분석 중..."):
+                    # Claude API로 실시간 트렌드 생성
+                    try:
+                        client = anthropic.Anthropic(api_key=api)
+                        
+                        current_date = datetime.now()
+                        year = current_date.year
+                        month = current_date.month
+                        day = current_date.day
+                        
+                        season = "봄" if month in [3,4,5] else "여름" if month in [6,7,8] else "가을" if month in [9,10,11] else "겨울"
+                        
+                        prompt = f"""당신은 블로그 SEO 전문가입니다. {cat} 카테고리에서 **{year}년 {month}월 {day}일 오늘** 검색량이 높고 방문자 증가에 효과적인 트렌드 키워드 10개를 추천하세요.
 
 조건:
 - 오늘 날짜 기준 시의성 (계절: {season})
@@ -513,50 +591,54 @@ with st.expander("🔥 트렌드 키워드 추천 (AI 실시간 생성!)", expan
 10. 키워드
 
 지금 {cat} 트렌드 키워드 10개만 출력!"""
-                    
-                    response = client.messages.create(
-                        model="claude-sonnet-4-20250514",
-                        max_tokens=500,
-                        temperature=0.9,
-                        messages=[{"role": "user", "content": prompt}]
-                    )
-                    
-                    content = response.content[0].text
-                    keywords = []
-                    for line in content.split('\n'):
-                        line = line.strip()
-                        if line and any(line.startswith(f"{i}.") for i in range(1, 11)):
-                            kw = line.split('.', 1)[1].strip()
-                            keywords.append(kw)
-                    
-                    if len(keywords) >= 10:
-                        st.session_state[cache_key] = keywords[:10]
-                        st.success("✅ 최신 트렌드 키워드 생성 완료!")
-                    else:
-                        st.session_state[cache_key] = get_trending_keywords(cat)
-                        st.info("백업 키워드 사용")
                         
-                except Exception as e:
-                    st.session_state[cache_key] = get_trending_keywords(cat)
-                    st.warning("백업 키워드 사용")
-        else:
-            st.session_state[cache_key] = get_trending_keywords(cat)
+                        response = client.messages.create(
+                            model="claude-sonnet-4-20250514",
+                            max_tokens=500,
+                            temperature=0.9,
+                            messages=[{"role": "user", "content": prompt}]
+                        )
+                        
+                        content = response.content[0].text
+                        keywords = []
+                        for line in content.split('\n'):
+                            line = line.strip()
+                            if line and any(line.startswith(f"{i}.") for i in range(1, 11)):
+                                kw = line.split('.', 1)[1].strip()
+                                keywords.append(kw)
+                        
+                        if len(keywords) >= 10:
+                            st.session_state[cache_key] = keywords[:10]
+                            st.success("✅ 최신 트렌드 키워드 생성 완료!")
+                        else:
+                            st.session_state[cache_key] = get_trending_keywords(cat)
+                            st.info("백업 키워드 사용")
+                            
+                    except Exception as e:
+                        st.session_state[cache_key] = get_trending_keywords(cat)
+                        st.warning("백업 키워드 사용")
+            else:
+                st.session_state[cache_key] = get_trending_keywords(cat)
+        
+        keywords = st.session_state.get(cache_key, get_trending_keywords(cat))
+        
+        st.markdown("### 💎 오늘의 TOP 10")
+        
+        cols = st.columns(2)
+        for idx, kw in enumerate(keywords):
+            with cols[idx % 2]:
+                analysis = analyze_keyword(kw)
+                badge = "🔥" if analysis["score"] >= 90 else "⭐"
+                
+                if st.button(f"{badge} {kw}", key=f"k{idx}", use_container_width=True):
+                    st.session_state['sel_kw'] = kw
+                    st.rerun()
+                
+                st.caption(f"점수:{analysis['score']} 검색:{analysis['search_volume']}")
     
-    keywords = st.session_state.get(cache_key, get_trending_keywords(cat))
-    
-    st.markdown("### 💎 오늘의 TOP 10")
-    
-    cols = st.columns(2)
-    for idx, kw in enumerate(keywords):
-        with cols[idx % 2]:
-            analysis = analyze_keyword(kw)
-            badge = "🔥" if analysis["score"] >= 90 else "⭐"
-            
-            if st.button(f"{badge} {kw}", key=f"k{idx}", use_container_width=True):
-                st.session_state['sel_kw'] = kw
-                st.rerun()
-            
-            st.caption(f"점수:{analysis['score']} 검색:{analysis['search_volume']}")
+    with tab3:
+        st.info("💡 **AI 맞춤 추천**: Claude가 카테고리별로 최적화된 키워드를 생성합니다.")
+        st.caption("곧 추가 예정")
 
 st.markdown("---")
 
