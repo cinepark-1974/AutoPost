@@ -301,6 +301,103 @@ def save_history(history):
     except:
         pass
 
+# 최신 트렌드 검색
+def search_latest_trends(keyword):
+    """Google News RSS로 최신 트렌드 검색"""
+    try:
+        url = f"https://news.google.com/rss/search?q={keyword}&hl=ko&gl=KR&ceid=KR:ko"
+        response = requests.get(url, timeout=10)
+        
+        if response.status_code == 200:
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(response.content)
+            
+            news_items = []
+            for item in root.findall('.//item')[:5]:
+                title = item.find('title').text if item.find('title') is not None else ""
+                google_link = item.find('link').text if item.find('link') is not None else ""
+                pub_date = item.find('pubDate').text if item.find('pubDate') is not None else ""
+                source = item.find('source').text if item.find('source') is not None else "출처 불명"
+                
+                actual_link = google_link
+                try:
+                    if "news.google.com" in google_link:
+                        redirect_response = requests.get(google_link, timeout=5, allow_redirects=True)
+                        actual_link = redirect_response.url
+                except:
+                    actual_link = google_link
+                
+                news_items.append({
+                    "title": title,
+                    "link": actual_link,
+                    "date": pub_date[:16],
+                    "source": source
+                })
+            
+            return news_items
+        return []
+    except:
+        return []
+
+# SEO 자동 최적화
+def apply_seo_triggers(content, keyword, year):
+    """SEO 점수를 자동으로 높이는 후처리"""
+    
+    if "## 태그" not in content:
+        tags = f"""
+
+## 태그
+#{keyword.replace(' ', '')} #{year} #최신 #추천 #정보 #꿀팁"""
+        content += tags
+    
+    keyword_count = content.lower().count(keyword.lower())
+    if keyword_count < 3:
+        insertion_point = content.find('\n\n', content.find('CINEPARK입니다.'))
+        if insertion_point > 0:
+            keyword_sentence = f"\n\n오늘은 {keyword}에 대해 자세히 알아보겠습니다!"
+            content = content[:insertion_point] + keyword_sentence + content[insertion_point:]
+    
+    if "댓글" not in content:
+        closing = f"""
+
+여러분은 {keyword}에 대해 어떻게 생각하시나요? 댓글로 경험을 공유해주세요!"""
+        
+        tag_pos = content.find("## 태그")
+        if tag_pos > 0:
+            content = content[:tag_pos] + closing + "\n\n" + content[tag_pos:]
+        else:
+            content += closing
+    
+    return content
+
+# 히스토리 관리
+def load_history():
+    try:
+        if HISTORY_FILE.exists():
+            with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                for item in data:
+                    if isinstance(item.get('timestamp'), str):
+                        item['timestamp'] = datetime.fromisoformat(item['timestamp'])
+                return data
+    except:
+        pass
+    return []
+
+def save_history(history):
+    try:
+        data = []
+        for item in history:
+            item_copy = item.copy()
+            if isinstance(item_copy.get('timestamp'), datetime):
+                item_copy['timestamp'] = item_copy['timestamp'].isoformat()
+            data.append(item_copy)
+        
+        with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except:
+        pass
+
 # API 키 관리
 def load_api_key():
     try:
@@ -360,73 +457,120 @@ def analyze_seo(title, content, keyword):
     
     return score, feedback
 
-# 블로그 글 생성 (핵심)
-def generate_post(keyword, category, word_count, api_key):
+# 블로그 글 생성 (핵심 함수)
+def generate_blog_post(keyword, category, word_count, claude_api_key, use_trends=True):
+    """방문객 증가에 최적화된 블로그 글 생성 - SEO 85점 이상 보장"""
     try:
-        client = anthropic.Anthropic(api_key=api_key)
+        client = anthropic.Anthropic(api_key=claude_api_key)
         
-        year = datetime.now().year
-        month = datetime.now().month
+        current_date = datetime.now()
+        year = current_date.year
+        month = current_date.month
+        day = current_date.day
+        
+        trend_info = ""
+        if use_trends:
+            trends = search_latest_trends(keyword)
+            if trends:
+                trend_text = "\n".join([
+                    f"- {item['title']} (출처: {item['source']})"
+                    for item in trends
+                ])
+                trend_info = f"\n\n최신 트렌드:\n{trend_text}\n"
         
         prompt = f"""당신은 49만 방문자를 달성한 CINEPARK 블로그 작가입니다.
 
 키워드: {keyword}
 카테고리: {category}
-목표 길이: {word_count}자
+목표 글자수: {word_count}자{trend_info}
 
-필수 규칙:
-1. 제목 28-32자 (키워드 자연스럽게 포함)
+⚠️ 경고: SEO 85점 미만 시 토큰 낭비! 아래 규칙을 정확히 따라야 합니다!
 
-2. 인사 (반드시 줄바꿈):
-안녕하세요.
-영화 프로듀서의 블로그, CINEPARK입니다.
+═══════════════════════════════════════
+📊 SEO 85점 이상 필수 조건 (절대 규칙!)
+═══════════════════════════════════════
 
-3. 구어체: ~더라고요, ~거든요, ~이에요, ~합니다, ~입니다
-   - 다양하게 섞어서 사용
-   - 너무 한 가지만 반복하지 말 것
+1. 제목 (25점):
+   ✅ 반드시: "{keyword}" 포함
+   ✅ 길이: 28-32자 (정확히!)
+   ❌ 금지: 26자 미만, 34자 이상
 
-4. 소제목 3-5개
+2. 인사말 (줄바꿈 필수!):
+   안녕하세요.
+   영화 프로듀서의 블로그, CINEPARK입니다.
 
-5. 키워드 3-8회
+3. 본문 길이 (20점):
+   ✅ 반드시: 1500-3000자
+   ❌ 금지: 1400자 미만
+   
+4. 키워드 밀도 (15점):
+   ✅ 반드시: "{keyword}" 정확히 3-8회
+   ❌ 금지: 2회 이하, 9회 이상
 
-6. 태그 섹션 포함
+5. 소제목 (10점):
+   ✅ 반드시: ## 형식 3-5개
+   ❌ 금지: 2개 이하
 
-CINEPARK 배경 (정확한 사실):
-- 영화 프로듀서 (광해, 하녀 투자)
-- 유럽, 아시아 25개 도시 여행
-- 콘텐츠 시나리오 전공
-- 소설 '감각구역' 작가 (교보문고 e-북)
+6. 구어체 (필수):
+   - ~더라고요, ~거든요, ~이에요
+   - ~합니다, ~입니다 (혼용)
 
-지금 자연스러운 블로그 글을 작성하세요!"""
+7. 태그 섹션 (10점):
+   ## 태그
+   #{keyword핵심단어} #{year} #프로듀서후기
+
+8. CINEPARK 배경 (정확한 사실):
+   - 영화 프로듀서 (광해, 하녀 투자)
+   - 유럽, 아시아 25개 도시 여행
+   - 콘텐츠 시나리오 전공
+   - 소설 '감각구역' 작가 (교보문고 e-북)
+
+═══════════════════════════════════════
+✅ 작성 전 자가 체크리스트
+═══════════════════════════════════════
+□ 제목에 "{keyword}" 포함? (필수!)
+□ 제목 28-32자? (필수!)
+□ 본문 1500자 이상? (필수!)
+□ "{keyword}" 3-8회? (필수!)
+□ 소제목 3-5개? (필수!)
+□ 태그 섹션 있음? (필수!)
+
+위 조건 하나라도 누락 시 SEO 85점 불가능!
+
+지금 바로 위 규칙을 정확히 따라 작성하세요!"""
         
-        response = client.messages.create(
+        message = client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=4000,
-            temperature=0.7,
+            temperature=0.5,  # 0.7 → 0.5 (더 정확하게)
             messages=[{"role": "user", "content": prompt}]
         )
         
-        content = response.content[0].text
-        
-        # SEO 자동 최적화
-        if "## 태그" not in content:
-            content += f"\n\n## 태그\n#{keyword.replace(' ', '')} #{year}"
-        
-        if "댓글" not in content:
-            tag_pos = content.find("## 태그")
-            if tag_pos > 0:
-                content = content[:tag_pos] + f"\n\n여러분은 {keyword}에 대해 어떻게 생각하시나요?\n\n" + content[tag_pos:]
+        content = message.content[0].text
+        content = apply_seo_triggers(content, keyword, year)
         
         title_match = re.search(r'##\s*(.+?)(?:\n|$)', content)
         title = title_match.group(1).strip() if title_match else keyword
         
-        score, feedback = analyze_seo(title, content, keyword)
+        score, feedback, improvements = analyze_seo(title, content, keyword)
+        
+        # 85점 미만이면 즉시 경고
+        if score < 85:
+            return {
+                "title": title,
+                "content": content,
+                "seo_score": score,
+                "feedback": feedback,
+                "improvements": improvements,
+                "warning": f"⚠️ SEO {score}점! 다시 생성 권장 (목표: 85점 이상)"
+            }
         
         return {
             "title": title,
             "content": content,
             "seo_score": score,
-            "feedback": feedback
+            "feedback": feedback,
+            "improvements": improvements
         }
         
     except Exception as e:
@@ -661,7 +805,7 @@ if st.button("✨ 생성", type="primary"):
         st.error("키워드 입력")
     else:
         with st.spinner("생성 중..."):
-            result = generate_post(keyword, category, word_count, api)
+            result = generate_blog_post(keyword, category, word_count, api, use_trends=False)
         
         if "error" in result:
             st.error(result['error'])
@@ -684,21 +828,38 @@ if st.button("✨ 생성", type="primary"):
             st.markdown(f"### SEO: {result['seo_score']}/100")
             
             if result['seo_score'] >= 85:
-                st.success("🏆 최상위 노출!")
+                st.success("🏆 최상위 노출! 완벽합니다!")
             elif result['seo_score'] >= 70:
-                st.info("👍 상위 노출")
+                st.warning("⚠️ 70점대 - 다시 생성 추천 (목표: 85점)")
+            else:
+                st.error("❌ 70점 미만 - 반드시 다시 생성하세요!")
+            
+            # warning 표시
+            if 'warning' in result:
+                st.warning(result['warning'])
             
             for fb in result['feedback']:
                 st.markdown(f"- {fb}")
             
+            if result.get('improvements'):
+                with st.expander("💡 개선 사항"):
+                    for imp in result['improvements']:
+                        st.markdown(f"- {imp}")
+            
             st.markdown("---")
             st.markdown(result['content'])
             
-            st.download_button(
-                "💾 다운로드",
-                result['content'],
-                f"post_{datetime.now().strftime('%Y%m%d')}.txt"
-            )
+            col_dl, col_retry = st.columns(2)
+            with col_dl:
+                st.download_button(
+                    "💾 다운로드",
+                    result['content'],
+                    f"post_{datetime.now().strftime('%Y%m%d')}.txt"
+                )
+            with col_retry:
+                if result['seo_score'] < 85:
+                    if st.button("🔄 다시 생성 (85점 목표)", type="primary"):
+                        st.rerun()
 
 # 히스토리
 if st.session_state['post_history']:
