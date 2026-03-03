@@ -471,121 +471,160 @@ def analyze_seo(title, content, keyword):
 # 블로그 글 생성 (핵심 함수)
 def generate_blog_post(keyword, category, word_count, claude_api_key, use_trends=True):
     """방문객 증가에 최적화된 블로그 글 생성 - SEO 85점 이상 보장"""
-    try:
-        client = anthropic.Anthropic(api_key=claude_api_key)
-        
-        current_date = datetime.now()
-        year = current_date.year
-        month = current_date.month
-        day = current_date.day
-        
-        trend_info = ""
-        if use_trends:
-            trends = search_latest_trends(keyword)
-            if trends:
-                trend_text = "\n".join([
-                    f"- {item['title']} (출처: {item['source']})"
-                    for item in trends
-                ])
-                trend_info = f"\n\n최신 트렌드:\n{trend_text}\n"
-        
-        prompt = f"""당신은 49만 방문자를 달성한 CINEPARK 블로그 작가입니다.
+    
+    max_retries = 3  # 최대 3번 시도
+    
+    for attempt in range(max_retries):
+        try:
+            client = anthropic.Anthropic(api_key=claude_api_key)
+            
+            current_date = datetime.now()
+            year = current_date.year
+            month = current_date.month
+            day = current_date.day
+            
+            trend_info = ""
+            if use_trends:
+                trends = search_latest_trends(keyword)
+                if trends:
+                    trend_text = "\n".join([
+                        f"- {item['title']} (출처: {item['source']})"
+                        for item in trends
+                    ])
+                    trend_info = f"\n\n최신 트렌드:\n{trend_text}\n"
+            
+            # 재시도마다 더 강력한 경고
+            warning_level = ""
+            if attempt == 0:
+                warning_level = "⚠️ 중요: SEO 85점 미만 시 사용자가 다시 생성해야 합니다!"
+            elif attempt == 1:
+                warning_level = "🚨 2차 시도: 이번에는 반드시 85점 이상 달성하세요!"
+            else:
+                warning_level = "🔴 최종 시도: 85점 미만 시 실패 처리됩니다!"
+            
+            prompt = f"""{warning_level}
+
+당신은 49만 방문자를 달성한 CINEPARK 블로그 작가입니다.
 
 키워드: {keyword}
 카테고리: {category}
 목표 글자수: {word_count}자{trend_info}
 
-⚠️ 경고: SEO 85점 미만 시 토큰 낭비! 아래 규칙을 정확히 따라야 합니다!
-
 ═══════════════════════════════════════
-📊 SEO 85점 이상 필수 조건 (절대 규칙!)
+🎯 필수 목표: SEO 85점 이상 (현재 시도: {attempt + 1}/3)
 ═══════════════════════════════════════
 
-1. 제목 (25점):
-   ✅ 반드시: "{keyword}" 포함
-   ✅ 길이: 28-32자 (정확히!)
-   ❌ 금지: 26자 미만, 34자 이상
+절대 규칙 (하나라도 누락 시 85점 불가능):
 
-2. 인사말 (줄바꿈 필수!):
+1. 제목 (25점 확보):
+   ✅ MUST: "{keyword}" 정확히 포함
+   ✅ MUST: 28-32자 (예: 30자)
+   ❌ "{keyword}" 없으면 0점!
+   ❌ 27자 이하, 33자 이상 감점!
+
+2. 인사말 (필수 형식):
    안녕하세요.
    영화 프로듀서의 블로그, CINEPARK입니다.
-
-3. 본문 길이 (20점):
-   ✅ 반드시: 1500-3000자
-   ❌ 금지: 1400자 미만
    
-4. 키워드 밀도 (15점):
-   ✅ 반드시: "{keyword}" 정확히 3-8회
-   ❌ 금지: 2회 이하, 9회 이상
+   (줄바꿈 필수!)
 
-5. 소제목 (10점):
-   ✅ 반드시: ## 형식 3-5개
-   ❌ 금지: 2개 이하
+3. 본문 길이 (20점 확보):
+   ✅ MUST: 1,500자 이상 필수
+   ✅ BEST: 1,800-2,500자
+   ❌ 1,499자 이하는 감점!
 
-6. 구어체 (필수):
-   - ~더라고요, ~거든요, ~이에요
-   - ~합니다, ~입니다 (혼용)
+4. 키워드 밀도 (15점 확보):
+   ✅ MUST: "{keyword}" 정확히 4-6회
+   ❌ 3회 이하, 7회 이상 감점!
+   
+   카운트 방법:
+   - 첫 문단: 1회
+   - 소제목: 1-2회
+   - 본문 중간: 2-3회
+   - 마무리: 1회
 
-7. 태그 섹션 (10점):
+5. 소제목 (10점 확보):
+   ✅ MUST: ## 형식 정확히 4개
+   ❌ 3개 이하, 6개 이상 감점!
+
+6. 태그 섹션 (10점 확보):
+   ✅ MUST: 반드시 포함
+   
    ## 태그
-   #키워드 #{year} #프로듀서후기
+   #키워드 #{year} #프로듀서후기 #현장경험
 
-8. CINEPARK 배경 (정확한 사실):
+7. 구어체 (필수):
+   - ~더라고요, ~거든요, ~이에요
+   - ~합니다, ~입니다 혼용
+
+8. CINEPARK 배경:
    - 영화 프로듀서 (광해, 하녀 투자)
    - 유럽, 아시아 25개 도시 여행
    - 콘텐츠 시나리오 전공
-   - 소설 '감각구역' 작가 (교보문고 e-북)
+   - 소설 '감각구역' 작가
 
 ═══════════════════════════════════════
-✅ 작성 전 자가 체크리스트
+✅ 작성 전 자가 점검 (85점 달성 체크리스트)
 ═══════════════════════════════════════
-□ 제목에 "{keyword}" 포함? (필수!)
-□ 제목 28-32자? (필수!)
-□ 본문 1500자 이상? (필수!)
-□ "{keyword}" 3-8회? (필수!)
-□ 소제목 3-5개? (필수!)
-□ 태그 섹션 있음? (필수!)
+□ 제목에 "{keyword}" 포함? → 25점
+□ 제목 28-32자? → 20점
+□ 본문 1,500자 이상? → 20점
+□ "{keyword}" 4-6회? → 15점
+□ 소제목 4개? → 10점
+□ 태그 섹션 있음? → 10점
+───────────────────────────
+합계: 100점 (목표: 85점 이상)
 
-위 조건 하나라도 누락 시 SEO 85점 불가능!
-
-지금 바로 위 규칙을 정확히 따라 작성하세요!"""
-        
-        message = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=4000,
-            temperature=0.5,  # 0.7 → 0.5 (더 정확하게)
-            messages=[{"role": "user", "content": prompt}]
-        )
-        
-        content = message.content[0].text
-        content = apply_seo_triggers(content, keyword, year)
-        
-        title_match = re.search(r'##\s*(.+?)(?:\n|$)', content)
-        title = title_match.group(1).strip() if title_match else keyword
-        
-        score, feedback, improvements = analyze_seo(title, content, keyword)
-        
-        # 85점 미만이면 즉시 경고
-        if score < 85:
-            return {
-                "title": title,
-                "content": content,
-                "seo_score": score,
-                "feedback": feedback,
-                "improvements": improvements,
-                "warning": f"⚠️ SEO {score}점! 다시 생성 권장 (목표: 85점 이상)"
-            }
-        
-        return {
-            "title": title,
-            "content": content,
-            "seo_score": score,
-            "feedback": feedback,
-            "improvements": improvements
-        }
-        
-    except Exception as e:
-        return {"error": str(e)}
+지금 바로 위 체크리스트를 확인하며 정확히 작성하세요!"""
+            
+            message = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=4000,
+                temperature=0.3,  # 더 낮춰서 정확도 UP
+                messages=[{"role": "user", "content": prompt}]
+            )
+            
+            content = message.content[0].text
+            content = apply_seo_triggers(content, keyword, year)
+            
+            title_match = re.search(r'##\s*(.+?)(?:\n|$)', content)
+            title = title_match.group(1).strip() if title_match else keyword
+            
+            score, feedback, improvements = analyze_seo(title, content, keyword)
+            
+            # 85점 이상이면 성공!
+            if score >= 85:
+                return {
+                    "title": title,
+                    "content": content,
+                    "seo_score": score,
+                    "feedback": feedback,
+                    "improvements": improvements,
+                    "success": True,
+                    "attempts": attempt + 1
+                }
+            
+            # 85점 미만이면 재시도 (마지막 시도는 그냥 반환)
+            if attempt == max_retries - 1:
+                return {
+                    "title": title,
+                    "content": content,
+                    "seo_score": score,
+                    "feedback": feedback,
+                    "improvements": improvements,
+                    "warning": f"⚠️ {max_retries}번 시도 후에도 {score}점. 키워드를 바꾸거나 다시 시도하세요.",
+                    "success": False,
+                    "attempts": attempt + 1
+                }
+            
+            # 다음 시도 계속
+            
+        except Exception as e:
+            if attempt == max_retries - 1:
+                return {"error": str(e)}
+            continue
+    
+    return {"error": "생성 실패"}
 
 # 페이지 설정
 st.set_page_config(
@@ -815,7 +854,7 @@ if st.button("✨ 생성", type="primary"):
     elif not keyword:
         st.error("키워드 입력")
     else:
-        with st.spinner("생성 중..."):
+        with st.spinner("SEO 85점 이상 달성할 때까지 자동 재시도 중..."):
             result = generate_blog_post(keyword, category, word_count, api, use_trends=False)
         
         if "error" in result:
@@ -836,18 +875,19 @@ if st.button("✨ 생성", type="primary"):
             save_history(st.session_state['post_history'])
             
             # 표시
-            st.markdown(f"### SEO: {result['seo_score']}/100")
+            attempts_info = f" ({result.get('attempts', 1)}번 시도)" if 'attempts' in result else ""
+            st.markdown(f"### SEO: {result['seo_score']}/100{attempts_info}")
             
             if result['seo_score'] >= 85:
-                st.success("🏆 최상위 노출! 완벽합니다!")
+                st.success(f"🏆 최상위 노출! 완벽합니다!{' (첫 시도 성공!)' if result.get('attempts') == 1 else ''}")
             elif result['seo_score'] >= 70:
-                st.warning("⚠️ 70점대 - 다시 생성 추천 (목표: 85점)")
+                st.warning("⚠️ 70점대 - 3번 시도했지만 85점 미달")
             else:
-                st.error("❌ 70점 미만 - 반드시 다시 생성하세요!")
+                st.error("❌ 70점 미만 - 키워드를 바꿔보세요")
             
             # warning 표시
             if 'warning' in result:
-                st.warning(result['warning'])
+                st.error(result['warning'])
             
             for fb in result['feedback']:
                 st.markdown(f"- {fb}")
@@ -860,17 +900,11 @@ if st.button("✨ 생성", type="primary"):
             st.markdown("---")
             st.markdown(result['content'])
             
-            col_dl, col_retry = st.columns(2)
-            with col_dl:
-                st.download_button(
-                    "💾 다운로드",
-                    result['content'],
-                    f"post_{datetime.now().strftime('%Y%m%d')}.txt"
-                )
-            with col_retry:
-                if result['seo_score'] < 85:
-                    if st.button("🔄 다시 생성 (85점 목표)", type="primary"):
-                        st.rerun()
+            st.download_button(
+                "💾 다운로드",
+                result['content'],
+                f"post_{datetime.now().strftime('%Y%m%d')}.txt"
+            )
 
 # 히스토리
 if st.session_state['post_history']:
