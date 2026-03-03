@@ -517,7 +517,7 @@ def generate_blog_post(keyword, category, word_count, claude_api_key, use_trends
 
 7. 태그 섹션 (10점):
    ## 태그
-   #{keyword핵심단어} #{year} #프로듀서후기
+   #키워드 #{year} #프로듀서후기
 
 8. CINEPARK 배경 (정확한 사실):
    - 영화 프로듀서 (광해, 하녀 투자)
@@ -869,3 +869,4 @@ if st.session_state['post_history']:
     for idx, post in enumerate(st.session_state['post_history'][:5]):
         with st.expander(f"{post['title'][:40]}... ({post['seo_score']}점)"):
             st.markdown(post['content'])
+
