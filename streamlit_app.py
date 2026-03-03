@@ -414,6 +414,7 @@ def save_api_key(key):
 def analyze_seo(title, content, keyword):
     score = 0
     feedback = []
+    improvements = []
     
     clean_title = title.replace("#", "").strip()
     
@@ -422,6 +423,7 @@ def analyze_seo(title, content, keyword):
         feedback.append("[OK] 제목에 키워드 포함")
     else:
         feedback.append("[X] 제목에 키워드 누락")
+        improvements.append(f"제목에 '{keyword}' 추가")
     
     title_len = len(clean_title)
     if 25 <= title_len <= 35:
@@ -429,6 +431,7 @@ def analyze_seo(title, content, keyword):
         feedback.append(f"[OK] 제목 최적 ({title_len}자)")
     else:
         feedback.append(f"[!] 제목 길이 ({title_len}자)")
+        improvements.append("제목 28-32자로 조정")
     
     content_len = len(content)
     if 1500 <= content_len <= 3000:
@@ -436,6 +439,8 @@ def analyze_seo(title, content, keyword):
         feedback.append(f"[OK] 본문 최적 ({content_len}자)")
     else:
         feedback.append(f"[!] 본문 길이 ({content_len}자)")
+        if content_len < 1500:
+            improvements.append(f"본문 {1500 - content_len}자 추가")
     
     kw_count = content.lower().count(keyword.lower())
     if 3 <= kw_count <= 8:
@@ -443,6 +448,8 @@ def analyze_seo(title, content, keyword):
         feedback.append(f"[OK] 키워드 밀도 ({kw_count}회)")
     else:
         feedback.append(f"[!] 키워드 밀도 ({kw_count}회)")
+        if kw_count < 3:
+            improvements.append(f"'{keyword}' {3 - kw_count}회 추가")
     
     subtitle_count = content.count("##") - 1
     if 3 <= subtitle_count <= 5:
@@ -450,12 +457,16 @@ def analyze_seo(title, content, keyword):
         feedback.append(f"[OK] 소제목 ({subtitle_count}개)")
     else:
         feedback.append(f"[!] 소제목 ({subtitle_count}개)")
+        if subtitle_count < 3:
+            improvements.append("소제목 3-5개 권장")
     
     if "#" in content:
         score += 10
         feedback.append("[OK] 태그 포함")
+    else:
+        improvements.append("태그 섹션 추가")
     
-    return score, feedback
+    return score, feedback, improvements
 
 # 블로그 글 생성 (핵심 함수)
 def generate_blog_post(keyword, category, word_count, claude_api_key, use_trends=True):
@@ -869,4 +880,3 @@ if st.session_state['post_history']:
     for idx, post in enumerate(st.session_state['post_history'][:5]):
         with st.expander(f"{post['title'][:40]}... ({post['seo_score']}점)"):
             st.markdown(post['content'])
-
