@@ -345,10 +345,19 @@ def generate_blog_post(keyword, category, word_count, api_key):
             
             # 이미지 검색
             images = search_unsplash_images(keyword, count=3)
+            
+            # 메인 이미지 (맨 위에 표시)
+            main_image = images[0] if images else {
+                "url": f"https://source.unsplash.com/1200x600/?{keyword}",
+                "credit": "Photo by Unsplash",
+                "description": f"{keyword} 대표 이미지"
+            }
+            
+            # 본문 삽입용 이미지 (나머지)
             image_text = "\n".join([
                 f"![{img['description']}]({img['url']})\n*{img['credit']}*"
-                for img in images
-            ]) if images else ""
+                for img in images[1:]
+            ]) if len(images) > 1 else ""
             
             # 프롬프트
             prompt = f"""당신은 49만 방문자를 달성한 CINEPARK 블로그 작가입니다.
@@ -538,6 +547,9 @@ def generate_blog_post(keyword, category, word_count, api_key):
 # ========================================
 # 5. UI
 # ========================================
+
+# 메인 헤더 이미지
+st.image("https://raw.githubusercontent.com/cinepark-1974/AutoPost/main/hero_image.png", use_container_width=True)
 
 st.title("✍️ AutoPost v9.0")
 st.caption("네이버 블로그 SEO 최적화 자동 글쓰기 (수익화 기능 포함)")
