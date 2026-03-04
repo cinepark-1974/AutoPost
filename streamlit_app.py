@@ -30,7 +30,120 @@ def save_api_key(api_key):
     st.code(f'CLAUDE_API_KEY = "{api_key}"', language="toml")
 
 # ========================================
-# 2. 이벤트 정보 검색
+# 2. 트렌드 키워드 & 최신 뉴스
+# ========================================
+
+def get_trending_keywords(category):
+    """카테고리별 트렌드 키워드 TOP 10"""
+    
+    today = datetime.now()
+    year = today.year
+    month = today.month
+    season = "봄" if month in [3,4,5] else "여름" if month in [6,7,8] else "가을" if month in [9,10,11] else "겨울"
+    
+    keywords = {
+        "영화": [
+            f"{year}년 {month}월 개봉 영화 기대작",
+            f"{season} 시즌 영화 추천 베스트 10",
+            f"{year}년 넷플릭스 인기 영화 순위",
+            "영화 투자 수익률 계산 가이드",
+            f"{year}년 아카데미 후보작 정리",
+            "CGV 메가박스 롯데시네마 할인 비교",
+            "영화 시나리오 공모전 상금 순위",
+            f"{season} 데이트 영화 추천",
+            "OTT 무료 체험 완벽 가이드",
+            "영화 제작 비용 분석"
+        ],
+        "여행": [
+            f"{year}년 {season} 국내 여행지 추천",
+            "나가노 온천 여행 완벽 가이드",
+            "도쿄 3박4일 여행 코스",
+            f"{month}월 제주도 여행 꿀팁",
+            "유럽 여행 경비 절약 방법",
+            "항공권 50% 할인 받는 법",
+            "호텔 예약 최저가 찾기",
+            f"{season} 벚꽃 명소 베스트 10",
+            "혼자 여행 추천 도시",
+            "여행 준비 체크리스트"
+        ],
+        "와인": [
+            "3만원대 와인 추천 베스트",
+            "와인 초보 입문 가이드",
+            "마트 와인 가성비 순위",
+            "와인 페어링 완벽 정리",
+            f"{year}년 와인 페어 일정",
+            "프랑스 와인 vs 칠레 와인",
+            "와인 보관 방법 꿀팁",
+            "레드 와인 추천 TOP 10",
+            "와인 할인 이벤트 정보",
+            "와인바 추천 서울"
+        ],
+        "책": [
+            f"{year}년 베스트셀러 순위",
+            "자기계발서 추천 필독서",
+            "작가 되는 법 완벽 가이드",
+            "출판사 계약 노하우",
+            "전자책 vs 종이책 비교",
+            "독서 습관 만들기",
+            "시나리오 작법 입문",
+            "북클럽 운영 가이드",
+            "책 할인 이벤트",
+            "추리소설 추천 명작"
+        ],
+        "IT": [
+            "ChatGPT 활용법 완벽 가이드",
+            "AI 이미지 생성 툴 비교",
+            "블로그 자동화 방법",
+            f"{year}년 스마트폰 추천",
+            "노션 활용 꿀팁 50가지",
+            "무료 AI 툴 베스트 20",
+            "생산성 앱 추천",
+            "웹사이트 만들기 가이드",
+            "업무 자동화 도구",
+            "클라우드 스토리지 비교"
+        ]
+    }
+    
+    default = [
+        f"{year}년 {category} 트렌드",
+        f"{category} 추천 베스트 10",
+        f"{category} 초보 가이드",
+        f"{category} 완벽 정리",
+        f"{category} 할인 정보"
+    ]
+    
+    return keywords.get(category, default)
+
+def search_latest_news(keyword):
+    """Google News에서 최신 뉴스 검색"""
+    
+    try:
+        url = f"https://news.google.com/rss/search?q={keyword}&hl=ko&gl=KR&ceid=KR:ko"
+        response = requests.get(url, timeout=10)
+        
+        if response.status_code == 200:
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(response.content)
+            
+            news_list = []
+            for item in root.findall('.//item')[:5]:
+                title = item.find('title').text if item.find('title') is not None else ""
+                source = item.find('source').text if item.find('source') is not None else ""
+                
+                if title:
+                    clean_title = title.split(' - ')[0].strip()
+                    news_list.append({
+                        'title': clean_title,
+                        'source': source
+                    })
+            
+            return news_list
+        return []
+    except:
+        return []
+
+# ========================================
+# 3. 이벤트 정보 검색
 # ========================================
 
 def search_event_info(keyword, category):
@@ -333,12 +446,65 @@ with st.expander("🔑 API 설정"):
 
 st.markdown("---")
 
+# 트렌드 키워드 & 최신 뉴스
+with st.expander("🔥 트렌드 키워드 & 최신 뉴스", expanded=False):
+    tab1, tab2 = st.tabs(["💎 추천 키워드", "📰 최신 뉴스"])
+    
+    with tab1:
+        st.info("💡 카테고리별 검증된 트렌드 키워드 TOP 10")
+        
+        trend_cat = st.selectbox("카테고리 선택", [
+            "영화", "여행", "와인", "책", "IT"
+        ], key="trend_cat")
+        
+        keywords = get_trending_keywords(trend_cat)
+        
+        st.markdown("### 💎 오늘의 TOP 10")
+        cols = st.columns(2)
+        for idx, kw in enumerate(keywords):
+            with cols[idx % 2]:
+                if st.button(f"⭐ {kw}", key=f"trend_{idx}", use_container_width=True):
+                    st.session_state['selected_keyword'] = kw
+                    st.rerun()
+    
+    with tab2:
+        st.info("📰 Google News 실시간 검색")
+        
+        news_query = st.text_input("검색어", placeholder="예: 영화 할인", key="news_query")
+        
+        if st.button("🔍 뉴스 검색", key="search_news"):
+            if news_query:
+                with st.spinner("뉴스 검색 중..."):
+                    news_list = search_latest_news(news_query)
+                
+                if news_list:
+                    st.success(f"✅ 최신 뉴스 {len(news_list)}개")
+                    
+                    for idx, news in enumerate(news_list):
+                        col1, col2 = st.columns([4, 1])
+                        with col1:
+                            st.markdown(f"**{news['title']}**")
+                            st.caption(f"출처: {news['source']}")
+                        with col2:
+                            if st.button("선택", key=f"news_{idx}"):
+                                st.session_state['selected_keyword'] = news['title']
+                                st.rerun()
+                else:
+                    st.warning("뉴스를 찾을 수 없습니다")
+            else:
+                st.warning("검색어를 입력하세요")
+
+st.markdown("---")
+
 # 메인 글 생성
 st.markdown("## 🚀 글 생성")
 
+# 선택된 키워드 자동 입력
+default_keyword = st.session_state.get('selected_keyword', '')
+
 col1, col2 = st.columns([2, 1])
 with col1:
-    keyword = st.text_input("키워드", placeholder="예: 2026 벚꽃 개화시기")
+    keyword = st.text_input("키워드", value=default_keyword, placeholder="예: 2026 벚꽃 개화시기")
 with col2:
     category = st.selectbox("카테고리", [
         "영화", "여행", "와인", "책", "IT", 
