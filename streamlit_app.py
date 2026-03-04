@@ -143,7 +143,31 @@ def search_latest_news(keyword):
         return []
 
 # ========================================
-# 3. 이벤트 정보 검색
+# 3. 이미지 검색 (Unsplash)
+# ========================================
+
+def search_unsplash_images(keyword, count=3):
+    """Unsplash에서 무료 이미지 검색"""
+    
+    try:
+        # Unsplash API (무료, 인증 불필요)
+        url = f"https://source.unsplash.com/800x600/?{keyword}"
+        
+        # 간단한 이미지 정보 반환
+        images = []
+        for i in range(count):
+            images.append({
+                "url": f"https://source.unsplash.com/800x600/?{keyword},{i}",
+                "credit": "Photo by Unsplash",
+                "description": f"{keyword} 관련 이미지 {i+1}"
+            })
+        
+        return images
+    except:
+        return []
+
+# ========================================
+# 4. 이벤트 정보 검색
 # ========================================
 
 def search_event_info(keyword, category):
@@ -319,6 +343,13 @@ def generate_blog_post(keyword, category, word_count, api_key):
                 for e in events
             ])
             
+            # 이미지 검색
+            images = search_unsplash_images(keyword, count=3)
+            image_text = "\n".join([
+                f"![{img['description']}]({img['url']})\n*{img['credit']}*"
+                for img in images
+            ]) if images else ""
+            
             # 프롬프트
             prompt = f"""당신은 49만 방문자를 달성한 CINEPARK 블로그 작가입니다.
 
@@ -330,22 +361,44 @@ def generate_blog_post(keyword, category, word_count, api_key):
 {event_text}
 
 ═══════════════════════════════════════
-🎯 SEO 85점 이상 필수 조건
+⚠️ 절대 규칙 - 반드시 지켜야 함!
 ═══════════════════════════════════════
 
-1. 제목: "{keyword}" 포함, 28-32자
+🚨 제목이 가장 중요합니다! (45점)
 
-2. 인사말 (줄바꿈 필수):
+반드시 글의 첫 줄에:
+## {keyword} 관련 제목 28-32자
+
+예시 (정확히 따라하세요):
+## CGV 메가박스 롯데시네마 할인 2026년 3월 완벽 정리
+
+규칙:
+1. ## 기호로 시작
+2. "{keyword}" 반드시 포함
+3. 정확히 28-32자
+4. 숫자나 년도 포함 권장
+
+❌ 절대 금지:
+- 제목 없이 본문부터 시작
+- 키워드 누락
+- 20자 이하 짧은 제목
+- 40자 이상 긴 제목
+
+✅ 올바른 예:
+## {keyword} 완벽 가이드 | {year}년 최신 정보 총정리
+
+지금 반드시 ## 제목부터 시작하세요!
+
+2. 인사말 (제목 다음 줄):
 안녕하세요.
 영화 프로듀서의 블로그, CINEPARK입니다.
 
 3. 본문: 1,500-3,000자
-   - 키워드 5-7회
-   - 소제목 4-5개
-   - 구어체 (~더라고요, ~거든요, ~합니다)
+   - "{keyword}" 본문에 5-7회 반복
+   - 소제목 4-5개 (## 형식)
+   - 구어체 (~더라고요, ~거든요)
 
-4. 수익화 섹션 (필수!):
-
+4. 수익화 섹션:
 ## 참고 정보 💡
 
 {keyword} 관련 할인/이벤트 정보를 확인해보세요!
@@ -355,47 +408,98 @@ def generate_blog_post(keyword, category, word_count, api_key):
 📅 이벤트 기간: [기간]
 ※ [주의사항]
 
-**2. [이벤트 제목]**
-- [확인 방법]
-📅 이벤트 기간: [기간]
-※ [주의사항]
-
-**3. [이벤트 제목]**
-- [확인 방법]
-📅 이벤트 기간: [기간]
-※ [주의사항]
-
-─────────────────
-⚠️ 위 정보는 변경될 수 있으니
-   각 사이트에서 확인하세요!
-
-5. 실행 가능한 가이드 (선택적 추가):
-   - 예산 계산
-   - 체크리스트
-   - 준비물
+5. 이미지 삽입 (선택):
+   
+   본문 중간중간에 아래 이미지 삽입:
+   {image_text}
+   
+   예시 위치:
+   - 첫 소제목 아래
+   - 중간 소제목 아래
+   - 마지막 부분
 
 6. 태그: 10개 이상
 
-7. CINEPARK 배경:
+6. CINEPARK 배경:
    - 영화 프로듀서 (광해, 하녀 투자)
-   - 유럽, 아시아 25개 도시 여행
-   - 콘텐츠 시나리오 전공
-   - 소설 '감각구역' 작가
 
-지금 바로 작성하세요!"""
+═══════════════════════════════════════
+⚠️ 다시 확인: 첫 줄은 ## {keyword} 포함 제목!
+═══════════════════════════════════════
+
+지금 바로 ## 제목부터 작성하세요!"""
 
             response = client.messages.create(
                 model="claude-sonnet-4-20250514",
                 max_tokens=4000,
-                temperature=0.4,
+                temperature=0.3,  # 0.4 → 0.3 (더 정확하게)
                 messages=[{"role": "user", "content": prompt}]
             )
             
             content = response.content[0].text
             
-            # 제목 추출
+            # 제목 추출 및 자동 생성 (강화됨!)
             title_match = re.search(r'##\s*(.+?)(?:\n|$)', content)
-            title = title_match.group(1).strip() if title_match else keyword
+            
+            if title_match:
+                title = title_match.group(1).strip()
+            else:
+                # 제목이 아예 없으면 키워드로 생성
+                title = f"{keyword} 완벽 가이드 | {year}년 최신 정보"
+            
+            # 제목 정제
+            clean_title = title.replace("#", "").strip()
+            
+            # === 제목 자동 수정 시스템 ===
+            
+            # 1. 키워드 포함 확인 (가장 중요!)
+            keyword_main = keyword.split()[0] if " " in keyword else keyword  # 핵심 키워드만
+            
+            if keyword_main.lower() not in clean_title.lower():
+                # 키워드가 없으면 강제로 추가
+                if len(clean_title) < 20:
+                    # 너무 짧으면 키워드를 앞에
+                    clean_title = f"{keyword} {clean_title}"
+                else:
+                    # 적당하면 키워드만 앞에 추가
+                    clean_title = f"{keyword} | {clean_title}"
+            
+            # 2. 길이 강제 조정 (28-32자)
+            title_len = len(clean_title)
+            
+            if title_len < 28:
+                # 28자 미만이면 무조건 추가
+                shortage = 28 - title_len
+                if shortage > 15:
+                    clean_title = f"{clean_title} | {year}년 최신 정보 완벽 가이드"
+                elif shortage > 8:
+                    clean_title = f"{clean_title} | {year}년 완벽 정리"
+                elif shortage > 4:
+                    clean_title = f"{clean_title} | {year}년"
+                else:
+                    clean_title = f"{clean_title} 정리"
+                    
+            elif title_len > 32:
+                # 32자 초과면 자르기
+                clean_title = clean_title[:30]
+                # 단어 중간에서 끊기지 않도록
+                if " " in clean_title:
+                    clean_title = clean_title.rsplit(" ", 1)[0]
+            
+            # 3. 최종 검증
+            final_len = len(clean_title)
+            if final_len < 28:
+                # 그래도 짧으면 강제로 28자 맞추기
+                clean_title = f"{clean_title} 총정리"
+            
+            # 최종 제목 확정
+            title = clean_title
+            
+            # 본문에서 첫 제목 교체
+            if title_match:
+                content = re.sub(r'##\s*.+?(?:\n)', f"## {title}\n", content, count=1)
+            else:
+                content = f"## {title}\n\n{content}"
             
             # SEO 분석
             score, feedback, improvements = analyze_seo(title, content, keyword)
@@ -550,6 +654,16 @@ if st.button("✨ 생성 (SEO 85점 자동 달성)", type="primary"):
             # 경고
             if 'warning' in result:
                 st.warning(result['warning'])
+            
+            # 이미지 미리보기
+            if keyword:
+                with st.expander("🖼️ 사용된 이미지 (Unsplash)"):
+                    images = search_unsplash_images(keyword, count=3)
+                    cols = st.columns(3)
+                    for idx, img in enumerate(images):
+                        with cols[idx]:
+                            st.image(img['url'], caption=img['description'], use_container_width=True)
+                            st.caption(img['credit'])
             
             st.markdown("---")
             st.markdown(result['content'])
