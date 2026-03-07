@@ -29,6 +29,81 @@ def save_api_key(api_key):
     st.info("💡 API 키는 Streamlit Cloud Settings > Secrets에서 설정하세요!")
     st.code(f'CLAUDE_API_KEY = "{api_key}"', language="toml")
 
+def classify_keyword_type(keyword):
+    """키워드 타입 자동 판별 - 맞춤형 콘텐츠 생성"""
+    
+    keyword_lower = keyword.lower()
+    
+    # 거래형 키워드 (Transaction)
+    transaction_keywords = [
+        "할인", "저렴", "가성비", "특가", "무료", "세일",
+        "구매", "신청", "받는법", "방법", "지원금", "혜택",
+        "쿠폰", "이벤트", "프로모션", "가격", "얼마"
+    ]
+    
+    # 일상형 키워드 (Casual)
+    casual_keywords = [
+        "날씨", "오늘", "오늘의", "이번주", "주말",
+        "추운", "더운", "비온", "눈온", "맑은",
+        "감상", "생각", "느낀", "느낌", "일상"
+    ]
+    
+    # 뉴스형 키워드 (News)
+    news_keywords = [
+        "속보", "최신", "긴급", "발표", "공개",
+        "신작", "개봉", "출시", "론칭"
+    ]
+    
+    # 판별
+    if any(kw in keyword_lower for kw in transaction_keywords):
+        return "transaction"
+    elif any(kw in keyword_lower for kw in casual_keywords):
+        return "casual"
+    elif any(kw in keyword_lower for kw in news_keywords):
+        return "news"
+    else:
+        return "information"  # 기본값
+
+def get_content_strategy(keyword_type, keyword, category):
+    """타입별 콘텐츠 전략 반환"""
+    
+    strategies = {
+        "transaction": {
+            "include_discount": True,
+            "include_realtime_data": True,
+            "include_official_links": True,
+            "include_event_info": True,
+            "tone": "실용적",
+            "focus": "가격, 할인, 구매처"
+        },
+        "information": {
+            "include_discount": False,
+            "include_realtime_data": False,
+            "include_official_links": False,
+            "include_event_info": False,
+            "tone": "설명적",
+            "focus": "상세 정보, 비교, 분석"
+        },
+        "casual": {
+            "include_discount": False,
+            "include_realtime_data": False,
+            "include_official_links": False,
+            "include_event_info": False,
+            "tone": "공감적",
+            "focus": "경험, 감상, 일상"
+        },
+        "news": {
+            "include_discount": False,
+            "include_realtime_data": True,
+            "include_official_links": False,
+            "include_event_info": False,
+            "tone": "속보형",
+            "focus": "최신 정보, 발표 내용"
+        }
+    }
+    
+    return strategies.get(keyword_type, strategies["information"])
+
 def search_realtime_data(keyword):
     """실시간 숫자, 금액, 데이터 검색"""
     
@@ -513,7 +588,7 @@ def analyze_seo(title, content, keyword):
 # ========================================
 
 def generate_blog_post(keyword, category, word_count, api_key):
-    """수익화 기능이 포함된 블로그 글 생성"""
+    """타입별 맞춤 블로그 글 생성 (불필요한 내용 제외)"""
     
     max_retries = 3
     
@@ -525,42 +600,54 @@ def generate_blog_post(keyword, category, word_count, api_key):
             year = today.year
             month = today.month
             
-            # 이벤트 정보 가져오기
-            events = search_event_info(keyword, category)
-            event_text = "\n".join([
-                f"- {e['title']}: {e['info']} (📅 {e['period']}, ※ {e['note']})"
-                for e in events
-            ])
+            # 키워드 타입 자동 판별
+            keyword_type = classify_keyword_type(keyword)
+            strategy = get_content_strategy(keyword_type, keyword, category)
             
-            # 실시간 데이터 검색
-            realtime_data = search_realtime_data(keyword)
+            # === 타입별 선택적 정보 수집 ===
+            
+            # 이벤트 정보 (거래형만)
+            event_text = ""
+            if strategy['include_event_info']:
+                events = search_event_info(keyword, category)
+                event_text = "\n참고 이벤트 정보 (글에 포함 가능):\n"
+                event_text += "\n".join([
+                    f"- {e['title']}: {e['info']} (📅 {e['period']}, ※ {e['note']})"
+                    for e in events
+                ])
+            
+            # 실시간 데이터 (거래형, 뉴스형만)
             data_text = ""
-            if realtime_data['money']:
-                data_text += "\n실제 금액:\n"
-                for amount, unit in realtime_data['money']:
-                    data_text += f"- {amount}{unit}\n"
-            if realtime_data['percent']:
-                data_text += "\n실제 비율:\n"
-                for pct in realtime_data['percent']:
-                    data_text += f"- {pct}%\n"
+            if strategy['include_realtime_data']:
+                realtime_data = search_realtime_data(keyword)
+                if realtime_data['money']:
+                    data_text += "\n실제 금액 (사용 권장):\n"
+                    for amount, unit in realtime_data['money']:
+                        data_text += f"- {amount}{unit}\n"
+                if realtime_data['percent']:
+                    data_text += "\n실제 비율:\n"
+                    for pct in realtime_data['percent']:
+                        data_text += f"- {pct}%\n"
             
-            # 공식 링크 검색
-            official_links = search_official_links(keyword, category)
-            links_text = "\n공식 링크:\n"
-            for link in official_links:
-                links_text += f"- [{link['name']}]({link['url']}): {link['desc']}\n"
+            # 공식 링크 (거래형만)
+            links_text = ""
+            if strategy['include_official_links']:
+                official_links = search_official_links(keyword, category)
+                links_text = "\n공식 링크 (신뢰도 UP):\n"
+                for link in official_links:
+                    links_text += f"- [{link['name']}]({link['url']}): {link['desc']}\n"
             
-            # 이미지 검색
+            # 이미지 검색 (모든 타입)
             images = search_unsplash_images(keyword, count=3)
             
-            # 메인 이미지 (맨 위에 표시)
+            # 메인 이미지
             main_image = images[0] if images else {
                 "url": f"https://source.unsplash.com/1200x600/?{keyword}",
                 "credit": "Photo by Unsplash",
                 "description": f"{keyword} 대표 이미지"
             }
             
-            # 본문 삽입용 이미지 (나머지)
+            # 본문 삽입용 이미지
             image_text = "\n".join([
                 f"![{img['description']}]({img['url']})\n*{img['credit']}*"
                 for img in images[1:]
@@ -569,159 +656,174 @@ def generate_blog_post(keyword, category, word_count, api_key):
             # 페르소나 가져오기
             persona = get_persona(category)
             
-            # 프롬프트
-            prompt = f"""당신은 49만 방문자를 달성한 CINEPARK 블로그 작가입니다.
+            # === 타입별 프롬프트 생성 ===
+            
+            if keyword_type == "transaction":
+                # 거래형: 할인/구매 중심
+                prompt = f"""당신은 49만 방문자를 달성한 CINEPARK 블로그 작가입니다.
 
 키워드: {keyword}
 카테고리: {category}
-목표 글자수: {word_count}자
+타입: 거래형 (할인/구매 정보 중심)
 
-페르소나 (항상 동일한 브랜드!):
-인사말: {persona['intro']}
+{persona['intro']}
 
-자연스러운 연결:
-"{persona['connection']}"를 활용해서 주제와 자연스럽게 연결
-
-신뢰도 강화:
-"{persona['credibility']}"를 언급하여 신뢰도 확보
-
-참고 이벤트 정보 (글에 반드시 포함):
 {event_text}
-
-실시간 데이터 (구체적 숫자 사용!):
 {data_text}
-
-공식 링크 (신뢰도 UP):
 {links_text}
 
 ═══════════════════════════════════════
-⚠️ 절대 규칙 - 반드시 지켜야 함!
+🎯 거래형 글쓰기 규칙
 ═══════════════════════════════════════
 
-💰 핵심 전략 3가지 (조회수 폭발!)
+1. 제목 (28-32자):
+## {keyword} 완벽 가이드 | {year}년 최신 정보
 
-1️⃣ 할인/저렴 키워드 우선 (54건 vs 7건!)
-2️⃣ 실시간 데이터 사용 (구체적 숫자!)
-3️⃣ 정부/공식 링크 신뢰도 (신뢰성!)
+2. 핵심 정보:
+- 구체적 가격/금액 필수
+- 구매처/신청처 명시
+- 할인 기간 표시
+- 공식 링크 포함
 
-═══════════════════════════════════════
+3. 구성:
+## 제목
+안녕하세요...
 
-🚨 제목이 가장 중요합니다! (45점)
+## 실제 가격은?
+**구체적 금액** 표시
 
-반드시 글의 첫 줄에:
-## {keyword} 할인 관련 제목 28-32자
+## 어디서 살 수 있나요?
+**구매처** + **링크**
 
-예시 (정확히 따라하세요):
-## CGV 메가박스 롯데시네마 할인 2026년 3월 완벽 정리
-## 재택치료 지원금 10만원 받는 법 | 2026년 최신
+## 참고 정보 💡
+공식 사이트 안내
 
-⚠️ 중요: "할인", "저렴", "가성비" 키워드 우선!
+4. 구어체: ~더라고요, ~했어요
 
-규칙:
-1. ## 기호로 시작
-2. "{keyword}" 반드시 포함
-3. "할인/저렴/무료" 키워드 포함 (조회수 8배!)
-4. 정확히 28-32자
-5. 숫자나 년도 포함 권장
+지금 바로 작성하세요!"""
 
-❌ 절대 금지:
-- 제목 없이 본문부터 시작
-- 키워드 누락
-- 20자 이하 짧은 제목
-- 40자 이상 긴 제목
+            elif keyword_type == "information":
+                # 정보형: 설명/비교 중심
+                prompt = f"""당신은 49만 방문자를 달성한 CINEPARK 블로그 작가입니다.
 
-✅ 올바른 예:
-## {keyword} 할인 완벽 가이드 | {year}년 최신 정보 총정리
+키워드: {keyword}
+카테고리: {category}
+타입: 정보형 (설명/비교 중심)
 
-지금 반드시 ## 제목부터 시작하세요!
-
-2. 인사말 (제목 다음 줄):
 {persona['intro']}
 
-"{persona['connection']}"를 활용해서 자연스럽게 연결
-"{persona['credibility']}"를 언급하여 신뢰도 확보
-
-3. 본문 스타일 (매우 중요!):
-   
-   ⚠️ 직접 경험한 것처럼 작성!
-   
-   ✅ 좋은 예:
-   "제가 직접 {keyword}을 해봤는데요, 처음엔 어려웠지만..."
-   "저도 {keyword} 때문에 고민이 많았거든요. 그래서 직접..."
-   "실제로 경험해보니 이런 점이 좋더라고요."
-   
-   ❌ 나쁜 예:
-   "{keyword}은 이렇습니다."
-   "{keyword}에 대해 알아보겠습니다."
-   
-   필수 표현:
-   - "제가 직접 해봤는데"
-   - "~더라고요", "~거든요", "~했어요"
-   - "솔직히", "개인적으로"
-   - "처음엔 ~했지만, 나중엔..."
-   
-4. 본문 구성: 1,500-3,000자
-   - "{keyword}" 본문에 5-7회 반복
-   - 소제목 4-5개 (## 형식)
-   - 경험담 중심
-   - **구체적 숫자 필수!**
-   
-   ⚠️ 구체적 숫자 사용 (매우 중요!):
-   
-   ✅ 좋은 예:
-   "재택치료 지원금은 **10만원**입니다"
-   "신청 후 **3일 만에** 입금됐어요"
-   "이 글은 **63만 뷰**를 기록했습니다"
-   "댓글이 **200개**나 달렸어요"
-   
-   ❌ 나쁜 예:
-   "지원금을 받을 수 있습니다"
-   "빠르게 입금됩니다"
-   "많은 조회수를 기록했습니다"
-   
-   위에 제공된 실시간 데이터의 숫자를 반드시 사용!
-
-5. 공식 링크 삽입 (신뢰도 UP!):
-
-## 공식 사이트 안내
-
-더 자세한 정보는 아래 공식 사이트를 참고하세요!
-
-- [정부24](링크): 정부 통합 서비스
-- [국세청 홈택스](링크): 세금 계산
-- [복지로](링크): 지원금 신청
-
-6. 후기 섹션 추가 (필수!):
-
-## 직접 해본 {keyword} 후기
-
-제가 실제로 {keyword}을 경험해보니,
-처음엔 어려웠지만 막상 해보니 생각보다 쉽더라고요.
-
-특히 [구체적 경험]이 가장 도움이 됐어요.
-여러분도 한번 해보시길 추천드립니다!
-
-6. 이미지 삽입 (선택):
-   
-   본문 중간중간에 아래 이미지 삽입:
-   {image_text}
-   
-   예시 위치:
-   - 첫 소제목 아래
-   - 중간 소제목 아래
-   - 마지막 부분
-
-6. 태그: 10개 이상
-
-6. CINEPARK 배경:
-   - 영화 프로듀서 (광해, 하녀 투자)
-
 ═══════════════════════════════════════
-⚠️ 다시 확인: 첫 줄은 ## {keyword} 포함 제목!
+🎯 정보형 글쓰기 규칙
 ═══════════════════════════════════════
 
-지금 바로 ## 제목부터 작성하세요!"""
+1. 제목 (28-32자):
+## {keyword} 완벽 가이드 | {year}년
 
+2. 핵심 정보:
+- 상세한 설명 (예: "피노 누아가 뭔가요?")
+- 비교/분석
+- 역사/배경
+- 예시/사례
+
+⚠️ 중요: 할인 정보, 구매 링크 넣지 마세요!
+→ 설명에 집중!
+
+3. 구성:
+## 제목
+안녕하세요...
+
+## {keyword}이/가 뭔가요?
+**상세 설명**
+
+## 왜 특별한가요?
+**차이점, 특징**
+
+## 추천하는 이유
+**개인 경험**
+
+4. 구어체: ~더라고요, ~했어요
+
+지금 바로 작성하세요!"""
+
+            elif keyword_type == "casual":
+                # 일상형: 공감/경험 중심
+                prompt = f"""당신은 49만 방문자를 달성한 CINEPARK 블로그 작가입니다.
+
+키워드: {keyword}
+카테고리: {category}
+타입: 일상형 (공감/경험 중심)
+
+{persona['intro']}
+
+═══════════════════════════════════════
+🎯 일상형 글쓰기 규칙
+═══════════════════════════════════════
+
+1. 제목 (28-32자):
+## {keyword} | 영화 프로듀서의 일상
+
+2. 핵심 정보:
+- 공감 표현
+- 개인 경험/감상
+- 편안한 대화체
+
+⚠️ 중요: 할인, 구매 링크, 공식 사이트 절대 넣지 마세요!
+→ 순수 일상/감상에 집중!
+
+3. 구성:
+## 제목
+안녕하세요...
+
+{keyword}에 대한 개인적인 생각과 경험을 자유롭게 작성
+
+4. 구어체 강화: 
+- ~더라고요, ~했어요
+- "솔직히", "개인적으로"
+- 편안한 대화체
+
+지금 바로 작성하세요!"""
+
+            else:  # news
+                # 뉴스형: 최신 정보 중심
+                prompt = f"""당신은 49만 방문자를 달성한 CINEPARK 블로그 작가입니다.
+
+키워드: {keyword}
+카테고리: {category}
+타입: 뉴스형 (최신 정보 중심)
+
+{persona['intro']}
+
+{data_text}
+
+═══════════════════════════════════════
+🎯 뉴스형 글쓰기 규칙
+═══════════════════════════════════════
+
+1. 제목 (28-32자):
+## {keyword} | {year}년 최신 속보
+
+2. 핵심 정보:
+- 발표 시기/날짜
+- 구체적 내용
+- 출처 명시
+
+⚠️ 중요: 할인, 구매 링크 넣지 마세요!
+→ 최신 정보에 집중!
+
+3. 구성:
+## 제목
+안녕하세요...
+
+## 무엇이 발표됐나요?
+**핵심 내용**
+
+## 언제부터인가요?
+**시기/일정**
+
+4. 구어체: ~더라고요, ~했어요
+
+지금 바로 작성하세요!"""
+            
             response = client.messages.create(
                 model="claude-sonnet-4-20250514",
                 max_tokens=4000,
@@ -905,6 +1007,23 @@ default_keyword = st.session_state.get('selected_keyword', '')
 col1, col2 = st.columns([2, 1])
 with col1:
     keyword = st.text_input("키워드", value=default_keyword, placeholder="예: 2026 벚꽃 개화시기")
+    
+    # 키워드 타입 자동 표시
+    if keyword and len(keyword) > 2:
+        keyword_type = classify_keyword_type(keyword)
+        type_emoji = {
+            "transaction": "💰",
+            "information": "📚",
+            "casual": "☕",
+            "news": "📰"
+        }
+        type_name = {
+            "transaction": "거래형 (할인/구매 정보)",
+            "information": "정보형 (설명/비교)",
+            "casual": "일상형 (공감/경험)",
+            "news": "뉴스형 (최신 속보)"
+        }
+        st.info(f"{type_emoji[keyword_type]} **자동 판별:** {type_name[keyword_type]}")
     
     # 롱테일 키워드 제안
     if keyword and len(keyword) > 2:
