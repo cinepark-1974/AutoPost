@@ -11,7 +11,7 @@ from prompts import get_transaction_prompt, get_information_prompt, get_casual_p
 # ═══════════════════════════════════════════════════════════════
 
 st.set_page_config(
-    page_title="AutoPost v10.0",
+    page_title="AutoPost v10.1",
     page_icon="✍️",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -550,8 +550,8 @@ def optimize_title(content, keyword, year, keyword_type):
 # 블로그 포스트 생성 (핵심 함수)
 # ═══════════════════════════════════════════════════════════════
 
-def generate_blog_post(keyword, category, word_count, api_key):
-    """블로그 포스트 생성 (최대 3회 재시도, SEO 85점 목표)"""
+def generate_blog_post(keyword, category, word_count, api_key, use_web_search=True):
+    """블로그 포스트 생성 (웹 검색 팩트 체크 + 최대 3회 재시도, SEO 85점 목표)"""
     max_retries = 3
 
     for attempt in range(max_retries):
@@ -608,15 +608,46 @@ def generate_blog_post(keyword, category, word_count, api_key):
             # 글자수 지침 추가
             prompt += f"\n\n【글자수 지침】\n본문 전체를 공백 포함 {word_count}자 내외로 작성하세요."
 
-            # Claude API 호출
-            response = client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=4000,
-                temperature=0.3,
-                messages=[{"role": "user", "content": prompt}]
-            )
+            # ═══════════════════════════════════════
+            # Claude API 호출 (웹 검색 도구 포함)
+            # ═══════════════════════════════════════
+            api_params = {
+                "model": "claude-sonnet-4-20250514",
+                "max_tokens": 4000,
+                "temperature": 0.3,
+                "messages": [{"role": "user", "content": prompt}]
+            }
 
-            content = response.content[0].text
+            # 웹 검색 도구 추가
+            if use_web_search:
+                api_params["tools"] = [{
+                    "type": "web_search_20250305",
+                    "name": "web_search",
+                    "max_uses": 5
+                }]
+
+            response = client.messages.create(**api_params)
+
+            # ═══════════════════════════════════════
+            # 응답 파싱 (웹 검색 결과 포함 처리)
+            # ═══════════════════════════════════════
+            content_parts = []
+            search_count = 0
+
+            for block in response.content:
+                if block.type == "text":
+                    content_parts.append(block.text)
+                elif block.type == "server_tool_use" and block.name == "web_search":
+                    search_count += 1
+                # web_search_tool_result는 Claude가 내부적으로 처리하므로 스킵
+
+            content = "".join(content_parts)
+
+            # 웹 검색 사용 횟수 기록
+            web_search_used = 0
+            if hasattr(response, 'usage') and hasattr(response.usage, 'server_tool_use'):
+                if hasattr(response.usage.server_tool_use, 'web_search_requests'):
+                    web_search_used = response.usage.server_tool_use.web_search_requests
 
             # 제목 최적화
             title = optimize_title(content, keyword, year, keyword_type)
@@ -640,7 +671,8 @@ def generate_blog_post(keyword, category, word_count, api_key):
                 "improvements": improvements,
                 "keyword_type": keyword_type,
                 "attempts": attempt + 1,
-                "success": score >= 85
+                "success": score >= 85,
+                "web_search_used": web_search_used,
             }
 
             if score >= 85:
@@ -666,8 +698,8 @@ def generate_blog_post(keyword, category, word_count, api_key):
 # UI 시작
 # ═══════════════════════════════════════════════════════════════
 
-st.title("✍️ AutoPost v10.0")
-st.caption("네이버 블로그 SEO 최적화 · 타입별 맞춤 생성 · CINEPARK")
+st.title("✍️ AutoPost v10.1")
+st.caption("네이버 블로그 SEO 최적화 · 타입별 맞춤 · 웹 검색 팩트 체크 · CINEPARK")
 
 # ───────────────────────────────────────
 # API 키 설정
@@ -779,6 +811,7 @@ with col_side:
         help="카테고리에 따라 페르소나와 연결 문구가 달라집니다."
     )
     word_count = st.slider("목표 글자수", 1500, 3000, 2000, step=100)
+    use_web_search = st.toggle("🔍 웹 검색 팩트 체크", value=True, help="AI가 글 생성 시 웹 검색으로 팩트를 확인합니다. 영화/OTT 정보의 정확성이 크게 향상됩니다. (검색당 $0.01 추가)")
 
     # 현재 페르소나 미리보기
     if category:
@@ -803,8 +836,8 @@ if generate_btn:
         keyword_type = classify_keyword_type(keyword)
         type_info = get_type_display(keyword_type)
 
-        with st.spinner(f"{type_info['emoji']} {type_info['name']} 포스트 생성 중..."):
-            result = generate_blog_post(keyword, category, word_count, api)
+        with st.spinner(f"{type_info['emoji']} {type_info['name']} 포스트 생성 중... {'(웹 검색 팩트 체크 ON)' if use_web_search else ''}"):
+            result = generate_blog_post(keyword, category, word_count, api, use_web_search=use_web_search)
 
         st.session_state['generated_result'] = result
 
@@ -833,6 +866,8 @@ if result:
 
         with info_col:
             st.markdown(f"**{type_info['emoji']} {type_info['name']}** | 시도 {result['attempts']}회")
+            if result.get('web_search_used', 0) > 0:
+                st.caption(f"🔍 웹 검색 {result['web_search_used']}회 수행 (팩트 체크 완료)")
             if result.get('warning'):
                 st.caption(result['warning'])
 
@@ -890,4 +925,4 @@ if st.session_state['post_history']:
 # 푸터
 # ───────────────────────────────────────
 st.markdown("---")
-st.caption("✍️ AutoPost v10.0 | BLUE JEANS PICTURES · CINEPARK | Powered by Claude AI")
+st.caption("✍️ AutoPost v10.1 | BLUE JEANS PICTURES · CINEPARK | Powered by Claude AI + Web Search")
