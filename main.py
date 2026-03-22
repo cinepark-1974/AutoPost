@@ -698,8 +698,105 @@ def generate_blog_post(keyword, category, word_count, api_key, use_web_search=Tr
 # 영어 리라이트 생성
 # ═══════════════════════════════════════════════════════════════
 
+def postprocess_english(content):
+    """영어 콘텐츠 후처리: 달러 이스케이프 + 특수문자 정리"""
+    # 1. 달러 기호 이스케이프 (Streamlit LaTeX 충돌 방지)
+    #    $100 million → USD 100 million (Blogger에서도 깔끔하게 표시)
+    content = re.sub(r'\$(\d)', r'USD \1', content)
+
+    # 2. 깨진 달러-텍스트 패턴 복구 (LaTeX 렌더링 오류 잔해)
+    #    $7.5million)—afraction... 같은 패턴 정리
+    content = re.sub(
+        r'USD\s*[\d,.]+\s*[a-zA-Z]*\)\s*[—\-]\s*[a-z].*?(?:USD\s*[\d,.]+\s*[a-zA-Z]*)',
+        lambda m: m.group(0),  # 이미 깨진 건 그대로 두되, 새로 생성 시 방지
+        content
+    )
+
+    # 3. 연속 공백 정리
+    content = re.sub(r' {2,}', ' ', content)
+
+    # 4. 빈 줄 3개 이상 → 2개로
+    content = re.sub(r'\n{3,}', '\n\n', content)
+
+    return content.strip()
+
+
+def markdown_to_html(content):
+    """마크다운을 Blogger용 HTML로 변환"""
+    lines = content.split('\n')
+    html_lines = []
+    in_paragraph = False
+
+    for line in lines:
+        stripped = line.strip()
+
+        # 빈 줄: 문단 닫기
+        if not stripped:
+            if in_paragraph:
+                html_lines.append('</p>')
+                in_paragraph = False
+            html_lines.append('')
+            continue
+
+        # ## 소제목 → <h2>
+        h2_match = re.match(r'^##\s+(.+)$', stripped)
+        if h2_match:
+            if in_paragraph:
+                html_lines.append('</p>')
+                in_paragraph = False
+            html_lines.append(f'<h2>{h2_match.group(1)}</h2>')
+            continue
+
+        # # 대제목 → <h1>
+        h1_match = re.match(r'^#\s+(.+)$', stripped)
+        if h1_match:
+            if in_paragraph:
+                html_lines.append('</p>')
+                in_paragraph = False
+            html_lines.append(f'<h1>{h1_match.group(1)}</h1>')
+            continue
+
+        # **볼드** → <strong>
+        stripped = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', stripped)
+
+        # *이탤릭* → <em>
+        stripped = re.sub(r'\*(.+?)\*', r'<em>\1</em>', stripped)
+
+        # [링크텍스트](URL) → <a href>
+        stripped = re.sub(
+            r'\[([^\]]+)\]\(([^)]+)\)',
+            r'<a href="\2" target="_blank" rel="noopener">\1</a>',
+            stripped
+        )
+
+        # 해시태그 줄 (Tags:로 시작하거나 #으로 시작)
+        if stripped.startswith('Tags:') or (stripped.startswith('#') and not stripped.startswith('<h')):
+            if in_paragraph:
+                html_lines.append('</p>')
+                in_paragraph = False
+            # 해시태그를 개별 span으로
+            tags_cleaned = stripped.replace('Tags:', '').strip()
+            tag_list = [t.strip() for t in tags_cleaned.split('#') if t.strip()]
+            tag_html = ' '.join([f'<span class="tag">#{t}</span>' for t in tag_list])
+            html_lines.append(f'<p class="tags">{tag_html}</p>')
+            continue
+
+        # 일반 텍스트 → <p> 안에 넣기
+        if not in_paragraph:
+            html_lines.append('<p>')
+            in_paragraph = True
+            html_lines.append(stripped)
+        else:
+            html_lines.append(f'<br/>{stripped}')
+
+    if in_paragraph:
+        html_lines.append('</p>')
+
+    return '\n'.join(html_lines)
+
+
 def generate_english_rewrite(korean_content, keyword, category, api_key):
-    """한국어 포스트를 영어권 독자용으로 완전 재구성"""
+    """한국어 포스트를 영어권 독자용으로 완전 재구성 (후처리 포함)"""
     try:
         client = anthropic.Anthropic(api_key=api_key)
         year = datetime.now().year
@@ -730,10 +827,17 @@ def generate_english_rewrite(korean_content, keyword, category, api_key):
             if hasattr(response.usage.server_tool_use, 'web_search_requests'):
                 web_search_used = response.usage.server_tool_use.web_search_requests
 
-        english_content = "".join(content_parts)
+        raw_content = "".join(content_parts)
+
+        # 후처리: 달러 이스케이프 + 특수문자 정리
+        clean_content = postprocess_english(raw_content)
+
+        # HTML 변환 (Blogger용)
+        html_content = markdown_to_html(clean_content)
 
         return {
-            "content": english_content,
+            "content": clean_content,       # 마크다운 (미리보기용)
+            "html_content": html_content,   # HTML (Blogger 복사용)
             "web_search_used": web_search_used,
             "success": True
         }
@@ -1000,18 +1104,39 @@ if result:
                     if eng_result.get('web_search_used', 0) > 0:
                         st.caption(f"🔍 웹 검색 {eng_result['web_search_used']}회 수행")
 
-                    st.markdown("### 🌐 English Version")
-                    st.markdown(eng_result['content'])
+                    # 미리보기 / HTML 탭
+                    eng_tab1, eng_tab2 = st.tabs(["📝 미리보기", "🔧 Blogger HTML"])
 
+                    with eng_tab1:
+                        st.markdown("### 🌐 English Version")
+                        st.markdown(eng_result['content'])
+
+                    with eng_tab2:
+                        st.markdown("### 🔧 Blogger HTML (복사해서 붙여넣기)")
+                        st.code(eng_result.get('html_content', ''), language="html")
+                        st.caption("Blogger > 새 게시물 > HTML 보기에서 이 코드를 붙여넣으세요.")
+
+                    # 다운로드 버튼
+                    eng_dl1, eng_dl2 = st.columns(2)
                     eng_filename = eng_keyword.replace(" ", "_")
-                    st.download_button(
-                        "💾 English TXT 다운로드",
-                        eng_result['content'],
-                        f"{eng_filename}_EN.txt",
-                        mime="text/plain",
-                        use_container_width=True,
-                        key="eng_download"
-                    )
+                    with eng_dl1:
+                        st.download_button(
+                            "💾 TXT 다운로드",
+                            eng_result['content'],
+                            f"{eng_filename}_EN.txt",
+                            mime="text/plain",
+                            use_container_width=True,
+                            key="eng_txt_dl"
+                        )
+                    with eng_dl2:
+                        st.download_button(
+                            "💾 HTML 다운로드 (Blogger용)",
+                            eng_result.get('html_content', ''),
+                            f"{eng_filename}_EN.html",
+                            mime="text/html",
+                            use_container_width=True,
+                            key="eng_html_dl"
+                        )
                 else:
                     st.error(eng_result.get('error', '영어 리라이트 생성 실패'))
 
