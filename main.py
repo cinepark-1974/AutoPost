@@ -4,7 +4,7 @@ import requests
 from datetime import datetime, timedelta
 import json
 import re
-from prompts import get_transaction_prompt, get_information_prompt, get_casual_prompt, get_news_prompt
+from prompts import get_transaction_prompt, get_information_prompt, get_casual_prompt, get_news_prompt, get_english_rewrite_prompt
 
 # ═══════════════════════════════════════════════════════════════
 # 페이지 설정
@@ -695,6 +695,58 @@ def generate_blog_post(keyword, category, word_count, api_key, use_web_search=Tr
 
 
 # ═══════════════════════════════════════════════════════════════
+# 영어 리라이트 생성
+# ═══════════════════════════════════════════════════════════════
+
+def generate_english_rewrite(korean_content, keyword, category, api_key):
+    """한국어 포스트를 영어권 독자용으로 완전 재구성"""
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+        year = datetime.now().year
+
+        prompt = get_english_rewrite_prompt(korean_content, keyword, category, year)
+
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=4000,
+            temperature=0.4,
+            tools=[{
+                "type": "web_search_20250305",
+                "name": "web_search",
+                "max_uses": 5
+            }],
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        # 응답 파싱
+        content_parts = []
+        web_search_used = 0
+
+        for block in response.content:
+            if block.type == "text":
+                content_parts.append(block.text)
+
+        if hasattr(response, 'usage') and hasattr(response.usage, 'server_tool_use'):
+            if hasattr(response.usage.server_tool_use, 'web_search_requests'):
+                web_search_used = response.usage.server_tool_use.web_search_requests
+
+        english_content = "".join(content_parts)
+
+        return {
+            "content": english_content,
+            "web_search_used": web_search_used,
+            "success": True
+        }
+
+    except anthropic.AuthenticationError:
+        return {"error": "❌ API 키가 올바르지 않습니다.", "success": False}
+    except anthropic.RateLimitError:
+        return {"error": "❌ API 호출 한도 초과. 잠시 후 다시 시도해주세요.", "success": False}
+    except Exception as e:
+        return {"error": f"❌ 영어 리라이트 실패: {str(e)}", "success": False}
+
+
+# ═══════════════════════════════════════════════════════════════
 # UI 시작
 # ═══════════════════════════════════════════════════════════════
 
@@ -908,6 +960,60 @@ if result:
                     "time": datetime.now().strftime("%H:%M")
                 })
                 st.success("히스토리에 저장했습니다!")
+
+        # ───────────────────────────────────────
+        # 🌐 영어 리라이트 섹션
+        # ───────────────────────────────────────
+        st.markdown("---")
+        st.markdown("### 🌐 English Rewrite for Google Blog")
+        st.caption("한국어 포스트를 영어권 독자용으로 완전 재구성합니다. (번역이 아닌 리라이트)")
+
+        eng_col1, eng_col2 = st.columns([3, 1])
+        with eng_col1:
+            eng_keyword = st.text_input(
+                "영어 키워드 (구글 SEO용)",
+                value="",
+                placeholder="예: Korean box office record, Netflix K-drama, K-Content analysis",
+                key="eng_keyword"
+            )
+        with eng_col2:
+            eng_category = st.selectbox(
+                "영어 카테고리",
+                ["K-Cinema", "K-Drama", "OTT", "Entertainment", "Industry"],
+                key="eng_category"
+            )
+
+        if st.button("🌐 영어 리라이트 생성", use_container_width=True):
+            api = load_api_key() or api_key_input
+            if not api:
+                st.error("⚠️ API 키를 입력해주세요.")
+            elif not eng_keyword:
+                st.error("⚠️ 영어 키워드를 입력해주세요.")
+            else:
+                with st.spinner("🌐 영어 리라이트 생성 중... (웹 검색 팩트 체크 포함)"):
+                    eng_result = generate_english_rewrite(
+                        result['content'], eng_keyword, eng_category, api
+                    )
+
+                if eng_result.get("success"):
+                    st.markdown("---")
+                    if eng_result.get('web_search_used', 0) > 0:
+                        st.caption(f"🔍 웹 검색 {eng_result['web_search_used']}회 수행")
+
+                    st.markdown("### 🌐 English Version")
+                    st.markdown(eng_result['content'])
+
+                    eng_filename = eng_keyword.replace(" ", "_")
+                    st.download_button(
+                        "💾 English TXT 다운로드",
+                        eng_result['content'],
+                        f"{eng_filename}_EN.txt",
+                        mime="text/plain",
+                        use_container_width=True,
+                        key="eng_download"
+                    )
+                else:
+                    st.error(eng_result.get('error', '영어 리라이트 생성 실패'))
 
 # ───────────────────────────────────────
 # 히스토리
