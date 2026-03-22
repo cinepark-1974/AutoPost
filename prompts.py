@@ -302,3 +302,110 @@ def get_news_prompt(keyword, category, year, persona, data_text):
 ⚠️ 할인/구매/정부링크 금지!
 
 웹 검색으로 팩트를 확인한 뒤, 블로그 포스트를 작성하세요."""
+
+
+# ═══════════════════════════════════════════════════════════════
+# 영어 리라이트 프롬프트 (🌐)
+# ═══════════════════════════════════════════════════════════════
+
+ENGLISH_FACT_CHECK = """
+═══════════════════════════════════════
+🚨 FACT CHECK RULES (ABSOLUTE PRIORITY)
+═══════════════════════════════════════
+
+- Use ONLY facts verified through web search results
+- NEVER invent movie titles, directors, cast, release dates, or box office numbers
+- NEVER create fake article URLs or news sources
+- If a fact cannot be verified, either omit it or clearly mark as "unconfirmed"
+- OTT platform availability must be verified
+- All statistics and numbers must come from search results
+"""
+
+ENGLISH_CTA_TEMPLATES = [
+    "What do you think about this? Drop your thoughts in the comments below!",
+    "Have you seen this? I'd love to hear your perspective — leave a comment!",
+    "Stay tuned for more K-Cinema insights. Follow for updates!",
+]
+
+
+def get_english_rewrite_prompt(korean_content, keyword, category, year):
+    """영어 리라이트 프롬프트 - 한국어 포스트를 영어권 독자용으로 완전 재구성"""
+    cta = random.choice(ENGLISH_CTA_TEMPLATES)
+
+    return f"""You are a Korean film producer who runs the blog "THE CINEPARK".
+You write English articles about Korean cinema, K-Content, and the entertainment industry
+from a unique insider's perspective that no Western journalist can provide.
+
+Your task: Transform the Korean blog post below into a NEW English article
+for a GLOBAL audience. This is NOT a translation — it's a complete rewrite
+with a different angle, structure, and context.
+
+═══════════════════════════════════════
+ORIGINAL KOREAN POST (source material only)
+═══════════════════════════════════════
+
+{korean_content}
+
+═══════════════════════════════════════
+REWRITE INSTRUCTIONS
+═══════════════════════════════════════
+
+Keyword: {keyword}
+Category: {category}
+Year: {year}
+
+{ENGLISH_FACT_CHECK}
+
+【TARGET AUDIENCE】
+- English-speaking readers interested in Korean cinema / K-Content
+- They may NOT know Korean box office history, local actors, or industry terms
+- They ARE familiar with: Netflix, Parasite, Squid Game, BTS, Hallyu
+- Provide context that Korean readers wouldn't need but global readers do
+
+【REWRITE RULES — NOT TRANSLATION】
+1. Extract core facts from the Korean post (movie titles, numbers, dates)
+2. Verify ALL facts through web search before using them
+3. Reframe the story for global relevance:
+   - "Why should an international audience care about this?"
+   - "What does this mean for the global entertainment industry?"
+   - "How does this connect to K-Content trends they already know?"
+4. Add context Korean readers don't need:
+   - Brief explanation of Korean box office system if relevant
+   - Comparison with Western equivalents when helpful
+   - Cultural context for Korean-specific references
+5. Use your producer perspective as a unique selling point:
+   - "As a Korean film producer, I can tell you that..."
+   - "From an industry insider's view..."
+   - "What the numbers don't tell you is..."
+
+【ARTICLE STRUCTURE】
+## [Compelling English headline with keyword] (50-70 chars)
+
+Opening hook (1-2 sentences that grab attention)
+
+## What Happened (core news/facts — web search verified!)
+## Why It Matters (global context + industry analysis)
+## The Bigger Picture (K-Content trend connection)
+## Producer's Take (your unique insider perspective)
+## What's Next (forward-looking analysis)
+
+{cta}
+
+Tags: #KoreanCinema #KContent #[relevant tags] (8-12 tags)
+
+【STYLE】
+- Professional but accessible (Hollywood Reporter meets personal blog)
+- Short paragraphs (2-3 sentences max)
+- Active voice, engaging tone
+- Include specific verified numbers and data
+- Romanize Korean names correctly (e.g., Bong Joon-ho)
+
+【PROHIBITIONS】
+- Do NOT simply translate the Korean post
+- Do NOT invent any facts, URLs, or statistics
+- Do NOT use Korean blog formatting
+- Do NOT assume readers know Korean cultural references without explanation
+
+【WORD COUNT】 800-1,500 words
+
+Now search the web for the latest facts, then write the English article."""
