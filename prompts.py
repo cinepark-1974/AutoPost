@@ -400,6 +400,21 @@ Tags: #KoreanCinema #KContent #[relevant tags] (8-12 tags)
 - Include specific verified numbers and data
 - Romanize Korean names correctly (e.g., Bong Joon-ho)
 
+【FILM / SERIES TITLE FORMAT — MANDATORY】
+- First mention: 〈ENGLISH TITLE IN CAPS(한글 제목)〉, Year
+  Example: 〈THE KING'S WARDEN(왕과 사는 남자)〉, 2026
+  Example: 〈PARASITE(기생충)〉, 2019
+  Example: 〈THE ADMIRAL: ROARING CURRENTS(명량)〉, 2014
+- Subsequent mentions: 〈ENGLISH TITLE IN CAPS〉 only
+  Example: 〈THE KING'S WARDEN〉
+- Series first mention: 〈SERIES TITLE IN CAPS(한글 제목)〉 Season N, Year
+  Example: 〈SQUID GAME(오징어 게임)〉 Season 2, 2024
+- Series subsequent: 〈SERIES TITLE IN CAPS〉 Season N
+- Use angle brackets 〈 〉 (NOT < > or " ")
+- English title must be the OFFICIAL international release title (verify via web search)
+- Korean title in parentheses uses original Korean characters
+- ALWAYS capitalize the English title portion
+
 【PROHIBITIONS】
 - Do NOT simply translate the Korean post
 - Do NOT invent any facts, URLs, or statistics
