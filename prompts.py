@@ -431,6 +431,38 @@ Now search the web for the latest facts, then write the English article."""
 # ═══════════════════════════════════════════════════════════════
 
 SHORTS_CATEGORIES = {
+    # ─── 씬스토리 감정 공감 서사 (트렌드 탑승형) ───
+    "설렘/로맨스": {
+        "emoji": "💕",
+        "desc": "사랑에 빠지는 순간, 설레는 감정의 서사",
+        "examples": ["카페에서 눈이 마주친 3초", "빗속에서 우산을 건넨 사람", "에겐남이 테토녀에게 반하는 순간", "첫 고백 직전 1초", "같은 노래를 흥얼거린 둘"],
+        "guide": "일상 속 '설렘의 순간'을 영화적 서사로 재구성. 감정을 직접 설명하지 않고 행동과 디테일로 보여줌. MBTI, 계절, 상황별 트렌드에 연결 가능. 훅은 결과(감정)를 먼저 던지고, 장면을 역순 또는 슬로우모션으로 풀어냄."
+    },
+    "이별/그리움": {
+        "emoji": "🌧️",
+        "desc": "헤어짐, 그리움, 돌아갈 수 없는 순간의 서사",
+        "examples": ["마지막 문자를 지우는 손", "빈 방에 남은 스티커 자국", "이사하는 날 빈 방", "전 애인이 좋아하던 노래가 들릴 때", "졸업식 날 뒤돌아보지 못한 이유"],
+        "guide": "감정을 절제하되 디테일로 울림을 줌. '슬프다'가 아니라 '커피잔 두 개를 습관처럼 꺼냈다'처럼 행동으로 감정을 보여줌. 비 오는 날, 계절 변화, 특정 장소와 연결하면 트렌드 탑승 가능."
+    },
+    "일상의 따뜻함": {
+        "emoji": "☕",
+        "desc": "가족, 이웃, 일상 속 따뜻한 순간의 서사",
+        "examples": ["할머니가 손주에게 주먹밥을 쥐어주는 손", "편의점 알바생의 작은 친절", "아버지가 새벽에 나가는 뒷모습", "동네 고양이와 할아버지", "퇴근길 엄마의 전화"],
+        "guide": "보편적 감정 이입이 가능한 일상 서사. '누구나 한 번쯤 경험한' 순간을 영화적으로 재구성. 가족, 세대, 계절 트렌드에 연결. 과하지 않은 따뜻함, 마지막 장면에서 여운."
+    },
+    "외로움/위로": {
+        "emoji": "🌙",
+        "desc": "혼자인 순간, 그리고 작은 위로의 서사",
+        "examples": ["새벽 편의점에서 혼자 라면 먹는 밤", "야근 후 빈 버스 창밖 네온사인", "자취방 천장을 바라보는 새벽 3시", "아무도 없는 카페에서 울고 있을 때", "모르는 사람에게서 온 작은 친절"],
+        "guide": "외로움을 감성적으로 묘사하되, 끝에 작은 위로나 빛을 남김. 자기 전 숏츠를 보는 타겟층과 감정적으로 연결. 도시 야경, 새벽, 비 오는 밤 등 시간대 설정이 중요."
+    },
+    "MBTI/트렌드 감정": {
+        "emoji": "🔥",
+        "desc": "MBTI, 유행어, 밈 기반 감정 트렌드 서사",
+        "examples": ["INFJ가 사랑에 빠지면 하는 행동", "에겐남이 테토녀 앞에서 멈춘 순간", "T와 F가 이별하는 방식의 차이", "MBTI별 첫 데이트 3초", "요즘 유행하는 그 감정"],
+        "guide": "실시간 트렌드 키워드(MBTI, 유행어, 밈)를 감정 서사에 결합. 댓글 유도형 구조('너는 어떤 타입?'). 제목에 트렌드 키워드를 반드시 포함. 소재는 매주 교체 가능하되 서사 구조(훅→여운)는 고정."
+    },
+    # ─── 기존 카테고리 (선택 사용) ───
     "역사 속 무명의 사람들": {
         "emoji": "🏛️",
         "desc": "이름 없이 사라진 사람들의 성장서사",
@@ -469,7 +501,101 @@ SHORTS_TONES = {
     "동화적 서술": "옛날이야기를 들려주는 듯한 톤. '옛날 옛적에' 느낌. 아이와 어른 모두 공감할 수 있는 보편적 언어.",
 }
 
+
+# ═══════════════════════════════════════════════════════════════
+# 🎲 숏츠 패턴 다변화 (AI 탐지 방지)
+# ═══════════════════════════════════════════════════════════════
+
+# 씬스토리 Scene Hook 패턴 (장면 1용 — 매번 다른 시작 방식)
+SCENE_HOOK_PATTERNS = [
+    "장면 묘사로 시작. 장소 + 시간 + 사람의 행동. 예: '카페 창가, 그 사람이 고개를 들었다.'",
+    "감각 묘사로 시작. 소리/냄새/촉감 중 하나. 예: '커피 향이 코끝에 닿았을 때, 누군가 내 앞에 앉았다.'",
+    "시간 표현으로 시작. 구체적 시간대. 예: '수요일 오후 네 시. 빈자리가 하나 있었다.'",
+    "날씨/계절로 시작. 예: '비가 유리창을 두드리고 있었다. 그때, 문이 열렸다.'",
+    "행동 중간에서 시작 (in medias res). 예: '고개를 돌리려는 순간, 눈이 마주쳤다.'",
+]
+
+# 의미 부여 패턴 (장면 2용)
+MEANING_PATTERNS = [
+    "1인칭 독백형. 예: 'INFJ인 나는, 그때부터 끝난 거였다.'",
+    "관찰자 서술형. 예: '그 사람은 아마 몰랐을 것이다. 건너편에서 누군가의 하루가 바뀌었다는 걸.'",
+    "질문형. 예: '세 번째 눈이 마주쳤을 때, 우연이라고 부를 수 있을까?'",
+    "시간 되감기형. 예: '지금 생각하면, 그게 시작이었다.'",
+    "반전 암시형. 예: '그런데 그때는 몰랐다. 이 장면이 어떻게 끝나는지.'",
+]
+
+# 여운 패턴 (마지막 -1 장면용)
+AFTERGLOW_PATTERNS = [
+    "미완의 문장형. 예: '그래서 아직도, 그 카페만 지나면...'",
+    "감각 회상형. 예: '그날의 커피 향이 아직도 코끝에 남아 있다.'",
+    "시간 경과형. 예: '일 년이 지났다. 그 자리엔 다른 사람이 앉아 있었다.'",
+    "반복 행동형. 예: '지금도 수요일 오후면 그 카페에 간다. 이유는 묻지 마.'",
+    "침묵형 (짧을수록 강함). 예: '그 사람은 아직도 모른다.'",
+]
+
+# 댓글 유도 패턴 (마지막 장면용)
+COMMENT_HOOK_PATTERNS = [
+    "너의 '그 장면'은 뭐야?",
+    "이런 장면, 있지 않아?",
+    "이거 나만 그래...?",
+    "어떤 MBTI가 제일 공감할까?",
+    "솔직히, 아직도 생각나는 사람 있지?",
+    "이 장면, 누가 떠올라?",
+    "당신의 그 장면을 댓글로 남겨주세요.",
+    "혹시... 지금 그 사람한테 연락했어?",
+]
+
+# 나레이션 문체 다변화 (전체 톤)
+SHORTS_NARRATION_STYLES = [
+    "짧은 문장 위주. 한 문장에 하나의 이미지만. 여백이 많은 서술. 쉼표 대신 마침표.",
+    "체언 종결형 혼합. '카페. 창가. 그 사람.' 같은 명사 나열을 간간이 섞어 리듬감 부여.",
+    "과거 회상 톤. '~였다', '~했었다' 체로 기억을 되짚는 느낌. 약간의 후회나 그리움.",
+    "현재 진행형. '~하고 있다', '~한다' 체로 지금 이 순간을 실시간 중계하는 느낌.",
+    "독백/방백 톤. '사실은', '그때는 몰랐다', '말하지 못한 건' 같은 속마음 토로 방식.",
+]
+
+# 성장서사 훅 패턴 다변화
+GROWTH_HOOK_PATTERNS = [
+    "이름 부재형. 예: '그의 이름은 어디에도 남지 않았다.'",
+    "숫자 충격형. 예: '사십 년. 단 하루도 쉬지 않았다.'",
+    "질문형. 예: '당신은 이 사람을 아시나요?'",
+    "역설형. 예: '세상을 바꾼 사람. 하지만 아무도 기억하지 못한다.'",
+    "현재 시제 도입형. 예: '지금 당신이 서 있는 그 길. 누군가 맨손으로 닦았다.'",
+]
+
+# 성장서사 여운 패턴 다변화
+GROWTH_ENDING_PATTERNS = [
+    "대비형. 예: '이름은 잊혔지만, 그가 남긴 것은 여전히 그곳에 서 있다.'",
+    "질문 전환형. 예: '우리는 과연, 그 사람의 이름을 기억해야 할까?'",
+    "현재 연결형. 예: '지금 이 순간에도, 누군가는 이름 없이 세상을 바꾸고 있다.'",
+    "감각 회상형. 예: '바람이 불면, 가끔 그의 발자국 소리가 들리는 것 같다.'",
+    "침묵형. 예: '그래서, 우리는 여기 서 있다.'",
+]
+
+
+def get_random_scene_hook():
+    return random.choice(SCENE_HOOK_PATTERNS)
+
+def get_random_meaning():
+    return random.choice(MEANING_PATTERNS)
+
+def get_random_afterglow():
+    return random.choice(AFTERGLOW_PATTERNS)
+
+def get_random_comment_hook():
+    return random.choice(COMMENT_HOOK_PATTERNS)
+
+def get_random_narration_style():
+    return random.choice(SHORTS_NARRATION_STYLES)
+
+def get_random_growth_hook():
+    return random.choice(GROWTH_HOOK_PATTERNS)
+
+def get_random_growth_ending():
+    return random.choice(GROWTH_ENDING_PATTERNS)
+
 SHORTS_IMAGE_STYLES = {
+    # ─── 일러스트 계열 ───
     "수채화/지브리풍": {
         "prompt_keywords": "watercolor illustration style, soft warm tones, Studio Ghibli inspired, gentle brush strokes, atmospheric lighting, muted colors with warm accents, delicate details, nostalgic mood, no text, no letters, no writing",
         "negative": "photorealistic, 3D render, anime, cartoon, harsh lighting, neon colors, text, letters, words, writing, signs, watermark"
@@ -485,6 +611,23 @@ SHORTS_IMAGE_STYLES = {
     "웜톤 애니메이션": {
         "prompt_keywords": "warm tone animation style, soft cel shading, gentle gradients, warm color palette, cozy illustration, character-focused, storybook quality, no text, no letters, no writing",
         "negative": "photorealistic, harsh shadows, neon, cyberpunk, dark theme, text, letters, words, writing, signs, watermark"
+    },
+    # ─── 시네마토그래피 계열 ───
+    "시네마틱 실사": {
+        "prompt_keywords": "cinematic photography, photorealistic, shallow depth of field, 35mm film grain, golden hour lighting, bokeh background, movie still aesthetic, warm color grading, dramatic composition, no text, no letters, no writing",
+        "negative": "illustration, cartoon, anime, 3D render, flat design, neon colors, oversaturated, text, letters, words, writing, signs, watermark"
+    },
+    "필름 누아르": {
+        "prompt_keywords": "film noir style photography, high contrast black and white with selective warm accent, dramatic shadows, venetian blind lighting, moody atmosphere, 1940s cinema aesthetic, grain texture, no text, no letters, no writing",
+        "negative": "colorful, bright, illustration, cartoon, anime, 3D render, neon, text, letters, words, writing, signs, watermark"
+    },
+    "한국영화 감성": {
+        "prompt_keywords": "Korean cinema aesthetic, naturalistic lighting, muted desaturated tones, rainy day mood, urban Korean setting, melancholic atmosphere, handheld camera feel, soft grain, warm shadows, no text, no letters, no writing",
+        "negative": "illustration, cartoon, anime, 3D render, oversaturated, Hollywood style, neon, text, letters, words, writing, signs, watermark"
+    },
+    "드림코어/감성 실사": {
+        "prompt_keywords": "dreamcore aesthetic, soft ethereal glow, pastel real-world photography, hazy dreamy atmosphere, light leaks, overexposed highlights, nostalgic film photography, liminal space feeling, no text, no letters, no writing",
+        "negative": "illustration, cartoon, anime, 3D render, sharp focus, high contrast, dark, neon, text, letters, words, writing, signs, watermark"
     },
 }
 
@@ -606,8 +749,147 @@ def get_shorts_script_prompt(topic, category, tone, image_style, num_scenes, lan
     if "중국어" in language_options:
         lang_instruction += "- 中文 (ZH): 自然流畅的翻译\n"
 
-    return f"""당신은 유튜브 숏츠 성장서사 전문 스크립트 작가입니다.
+    # 카테고리 타입에 따라 서사 구조 분기
+    scenestory_categories = ["설렘/로맨스", "이별/그리움", "일상의 따뜻함", "외로움/위로", "MBTI/트렌드 감정"]
+    is_scenestory = category in scenestory_categories
 
+    if is_scenestory:
+        # 랜덤 패턴 선택
+        hook_pattern = get_random_scene_hook()
+        meaning_pattern = get_random_meaning()
+        afterglow_pattern = get_random_afterglow()
+        comment_hook = get_random_comment_hook()
+        narration_style = get_random_narration_style()
+
+        structure_block = f"""═══════════════════════════════════════
+📐 씬스토리 감정 서사 구조 (수익화 최적화)
+═══════════════════════════════════════
+
+【채널 철학】 "모든 장면엔 이야기가 있다 (Every scene has a story)"
+하나의 구체적 장면(Scene)에서 출발하여, 그 장면이 이야기(Story)로 펼쳐지는 구조.
+감정이나 개념이 아니라, "눈에 보이는 장면 하나"가 모든 서사의 출발점이다.
+
+【씬스토리 핵심 문법 — Scene First】
+- 모든 에피소드는 "하나의 장면"에서 시작한다
+- ❌ "INFJ는 사랑에 빠져도 아무도 모른다" (개념에서 시작 — 금지)
+- ✅ "카페 창가, 그 사람이 책장을 넘겼다" (장면에서 시작 — 올바름)
+- 훅조차도 "장면의 한 컷"이어야 한다 — 상황 묘사가 먼저, 감정은 나중에
+- 관객은 장면을 "보고", 감정은 스스로 "느끼게" 해야 한다
+
+【이번 에피소드 서사 스타일 (랜덤 배정 — 매번 다른 패턴)】
+- Scene Hook 패턴: {hook_pattern}
+- 의미 부여 패턴: {meaning_pattern}
+- 여운 패턴: {afterglow_pattern}
+- 댓글 유도: "{comment_hook}"
+- 나레이션 문체: {narration_style}
+⚠️ 위 패턴을 참고하되 그대로 복사하지 말 것. 주제에 맞게 변형하여 사용.
+
+【필수 구조: Scene Hook → 의미 부여 → 감정 확대 → 내면 → 반전 → 여운 → 댓글 유도】
+
+장면 1 (Scene Hook — 장면이 곧 훅): 사람이 있는 구체적 장면 하나가 곧 훅이다. 풍경만 ❌ 개념만 ❌
+  → 반드시 사람의 행동/제스처가 포함되어야 함 (뒷모습, 손, 시선, 몸짓)
+  → 이 나레이션 = 첫 이미지. 이미지에 사람(뒷모습/실루엣)이 반드시 있어야 함.
+  → 위에 배정된 Scene Hook 패턴을 참고하되 자유롭게 변형
+장면 2 (의미 부여): Scene Hook에 맥락을 더하는 한 문장.
+  → 위에 배정된 의미 부여 패턴을 참고하되 자유롭게 변형
+  → 트렌드 키워드가 장면 1에 없었다면 여기서 반드시 삽입
+장면 3~{num_scenes - 4} (감정 확대): 그 장면을 슬로우모션처럼 펼친다. 감각적 디테일로 감정을 쌓아감.
+  → 감정을 직접 말하지 않고 행동으로만 보여줌 ("떨렸다" ❌ → "커피잔을 두 손으로 감쌌다" ✅)
+  → 매 장면이 "하나의 컷"이어야 함 — 이미지 한 장으로 그릴 수 있는 장면
+  → 모든 장면에 사람(또는 사람의 흔적)이 있어야 함
+장면 {num_scenes - 3} (내면 독백): 장면이 끝난 뒤, 주인공의 속마음.
+  → 장면에서 감정으로 전환되는 유일한 지점
+장면 {num_scenes - 2} (반전 또는 깨달음): 새로운 장면이 열리는 순간.
+  → 반전이 있으면 재시청 유도 (숏츠 알고리즘에 유리)
+  → 이것도 "장면"으로 보여줘야 함
+장면 {num_scenes - 1} (여운): 마지막 장면. 짧고 강렬한 이미지 + 한 문장.
+  → 위에 배정된 여운 패턴을 참고하되 자유롭게 변형
+  → 닫히지 않는 장면 — 관객의 상상에 맡김
+장면 {num_scenes} (댓글 유도): 시청자에게 질문을 던지는 마지막 자막.
+  → 위에 배정된 댓글 유도 문구를 참고하되, 주제에 맞게 변형. 같은 문구 반복 금지.
+  → 이 장면은 나레이션 없이 자막만 (TTS 없음). 이미지는 여운 장면 유지 또는 채널 로고.
+
+【Scene Hook 체크리스트 — 장면 1 필수 확인】
+□ 사람(뒷모습/실루엣/손/시선)이 있는가?
+□ 구체적 장소가 있는가? (카페, 버스, 교실, 편의점 등)
+□ 행동/제스처가 있는가? (고개를 들었다, 걸음을 멈췄다, 책장을 넘겼다)
+□ 이 나레이션으로 이미지 한 장을 바로 그릴 수 있는가?
+□ 이 한 장면만으로 "무슨 이야기지?" 궁금증이 생기는가?
+
+【AI 탐지 방지 — 패턴 반복 금지 규칙】
+- 이전 에피소드와 동일한 첫 문장 구조 사용 금지
+- "그래서 아직도~", "그때는 몰랐다~" 같은 상투적 패턴 연속 사용 금지
+- 매 에피소드마다 다른 감각(시각/청각/촉각/후각)으로 시작
+- 문장 길이에 변화를 줄 것 (3자 문장과 20자 문장을 섞어서)
+- 같은 마무리 구조 2회 연속 사용 금지
+
+【수익화 최적화 규칙】
+- 제목 형식: "[장면] + [감정 키워드]" (예: "카페에서 눈이 마주친 3초 | INFJ의 사랑법")
+- 해시태그에 트렌드 키워드 + 감정 키워드 + #씬스토리 + #SceneStory + #everyscenehasastory
+- 시리즈 확장: 같은 장면을 다른 MBTI로 / 같은 감정을 다른 장면으로
+- description에 "다음 장면: [예고]" 포함하여 구독 유도
+- 마지막 댓글 유도는 주제에 맞게 매번 다르게 (채널 철학과 일치)
+
+【나레이션 규칙】
+- 이번 에피소드 문체: {narration_style}
+- 한 장면당 1~2문장 (최대 30자 이내/문장 — 숏츠 자막 가독성)
+- 전체 숏츠 길이: 45~55초 (TTS 기준, 너무 길면 이탈)
+- 감정을 직접 명시하지 않음 — Show, don't tell의 극단적 적용
+- 마지막에서 두 번째 장면이 감정의 피크, 마지막은 반드시 여운
+
+【저작권 규칙】
+- 실존 인물의 이름, 얼굴 묘사 금지
+- 특정 브랜드, 로고, 상표 언급 금지
+- MBTI 유형명은 사용 가능 (상표가 아닌 일반 용어로 취급)"""
+    else:
+        # 성장서사 랜덤 패턴 선택
+        growth_hook = get_random_growth_hook()
+        growth_ending = get_random_growth_ending()
+        narration_style = get_random_narration_style()
+
+        structure_block = f"""═══════════════════════════════════════
+📐 성장서사 대본 구조 규칙
+═══════════════════════════════════════
+
+【이번 에피소드 서사 스타일 (랜덤 배정 — 매번 다른 패턴)】
+- 훅 패턴: {growth_hook}
+- 여운 패턴: {growth_ending}
+- 나레이션 문체: {narration_style}
+⚠️ 위 패턴을 참고하되 그대로 복사하지 말 것. 주제에 맞게 변형하여 사용.
+
+【필수 구조: 훅 → 설정 → 고난 → 전환 → 결말 → 여운】
+
+장면 1 (훅): 위에 배정된 훅 패턴을 참고하여 시청자를 멈추게 하는 한 문장.
+  → 매번 다른 방식으로 시작. 이전 에피소드와 같은 구조 사용 금지.
+장면 2 (설정): 시대, 장소, 인물의 상황을 1~2문장으로 압축.
+장면 3~{num_scenes - 3} (고난/전개): 고난과 노력의 반복. 구체적 디테일(숫자, 감각, 행동).
+장면 {num_scenes - 2} (전환): 고난이 의미로 바뀌는 순간. 서사의 전환점.
+장면 {num_scenes - 1} (결말): 시간의 흐름 또는 결과. 성장의 완성.
+장면 {num_scenes} (여운): 위에 배정된 여운 패턴을 참고. 같은 마무리 구조 반복 금지.
+
+【AI 탐지 방지 — 패턴 반복 금지 규칙】
+- "그는 이름도 남기지 못했습니다" 류의 동일 패턴 반복 금지
+- 매 에피소드마다 다른 훅 방식 사용 (숫자, 질문, 역설, 현재시제 등 변화)
+- 같은 여운 구조 2회 연속 사용 금지
+- 문장 길이에 변화를 줄 것 (단문과 복문 혼합)
+
+【나레이션 규칙】
+- 이번 에피소드 문체: {narration_style}
+- 한 장면당 1~2문장 (최대 40자 이내/문장)
+- 전체 숏츠 길이: 50~60초 (TTS 기준)
+- 설명하지 말고 보여줘라 (Show, don't tell)
+- 감정을 직접 명시하지 않음 ("슬펐다" ❌ → "편지를 접어 서랍에 넣었다" ✅)
+- 마지막 장면은 반드시 여운을 남기는 한 문장
+
+【저작권·초상권 규칙】
+- 실존 인물의 이름, 얼굴 묘사 금지
+- 특정 브랜드, 로고, 상표 언급 금지
+- 시대와 장소는 구체적으로, 인물은 익명으로"""
+
+    # 역사 팩트 체크 블록 (성장서사에만 적용)
+    fact_check_block = ""
+    if not is_scenestory:
+        fact_check_block = f"""
 ═══════════════════════════════════════
 🚨 역사 팩트 체크 규칙 (최우선 — 모든 규칙보다 우선)
 ═══════════════════════════════════════
@@ -635,7 +917,13 @@ def get_shorts_script_prompt(topic, category, tone, image_style, num_scenes, lan
 1. 시대/연도의 정확성
 2. 해당 시대에 존재한 직업/시설/제도
 3. 지명과 지리적 사실
-4. 역사적 사건의 시기와 맥락
+4. 역사적 사건의 시기와 맥락"""
+
+    # 씬스토리 작가 역할 설정
+    writer_role = "당신은 유튜브 숏츠 채널 '씬스토리(SceneStory)'의 감정 서사 전문 스크립트 작가입니다." if is_scenestory else "당신은 유튜브 숏츠 성장서사 전문 스크립트 작가입니다."
+
+    return f"""{writer_role}
+{fact_check_block}
 
 ═══════════════════════════════════════
 🎬 기본 정보
@@ -648,31 +936,7 @@ def get_shorts_script_prompt(topic, category, tone, image_style, num_scenes, lan
 【이미지 스타일】 {image_style}
 【장면 수】 {num_scenes}장
 
-═══════════════════════════════════════
-📐 숏츠 대본 구조 규칙
-═══════════════════════════════════════
-
-【필수 구조: 훅 → 설정 → 고난 → 전환 → 결말 → 여운】
-
-장면 1 (훅): 결말의 감정을 먼저 던진다. "그는 이름도 남기지 못했습니다" 같은 문장.
-  → 시청자가 3초 안에 멈추게 만드는 문장. 의문 또는 감정 유발.
-장면 2 (설정): 시대, 장소, 인물의 상황을 1~2문장으로 압축.
-장면 3~{num_scenes - 3} (고난/전개): 고난과 노력의 반복. 구체적 디테일(숫자, 감각, 행동).
-장면 {num_scenes - 2} (전환): 고난이 의미로 바뀌는 순간. 서사의 전환점.
-장면 {num_scenes - 1} (결말): 시간의 흐름 또는 결과. 성장의 완성.
-장면 {num_scenes} (여운): 짧고 강렬한 마무리 한 문장. 여백을 남김.
-
-【나레이션 규칙】
-- 한 장면당 1~2문장 (최대 40자 이내/문장)
-- 전체 숏츠 길이: 50~60초 (TTS 기준)
-- 설명하지 말고 보여줘라 (Show, don't tell)
-- 감정을 직접 명시하지 않음 ("슬펐다" ❌ → "편지를 접어 서랍에 넣었다" ✅)
-- 마지막 장면은 반드시 여운을 남기는 한 문장
-
-【저작권·초상권 규칙】
-- 실존 인물의 이름, 얼굴 묘사 금지
-- 특정 브랜드, 로고, 상표 언급 금지
-- 시대와 장소는 구체적으로, 인물은 익명으로
+{structure_block}
 
 ═══════════════════════════════════════
 🎨 이미지 프롬프트 규칙 — {image_platform} 전용
@@ -690,8 +954,7 @@ def get_shorts_script_prompt(topic, category, tone, image_style, num_scenes, lan
 - 모든 프롬프트에 "no text, no letters, no words, no writing, no signs" 포함 (AI가 이미지에 의미 없는 글자를 생성하는 것을 방지)
 - 인물의 얼굴을 정면으로 묘사하지 않음 (뒷모습, 실루엣, 멀리서 본 모습)
 - 장면마다 조명/색감 변화로 감정 곡선을 표현
-- 고난 장면: 어두운 톤, 차가운 색감
-- 전환/결말: 따뜻한 톤, 골든아워 조명
+- {"감정 서사 조명: 설렘 장면은 따뜻한 골든아워/카페 조명, 내면 독백은 블루아워/창가 빛, 여운은 노을빛 또는 새벽빛" if is_scenestory else "고난 장면: 어두운 톤, 차가운 색감 / 전환/결말: 따뜻한 톤, 골든아워 조명"}
 - 전체 장면에 걸쳐 동일한 스타일 키워드를 반복하여 시각적 일관성 유지
 
 ═══════════════════════════════════════
