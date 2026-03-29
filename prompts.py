@@ -489,12 +489,111 @@ SHORTS_IMAGE_STYLES = {
 }
 
 
-def get_shorts_script_prompt(topic, category, tone, image_style, num_scenes, language_options):
+# ═══════════════════════════════════════════════════════════════
+# 🖼️ 이미지 생성 플랫폼별 프롬프트 규칙
+# ═══════════════════════════════════════════════════════════════
+
+SHORTS_IMAGE_PLATFORMS = {
+    "Midjourney": {
+        "emoji": "🟣",
+        "desc": "Discord 기반, 스타일리시한 결과물. 월 $10~",
+        "prompt_rule": """각 장면마다 Midjourney용 영문 프롬프트를 생성하세요.
+
+【Midjourney 프롬프트 형식】
+[장면 묘사, 구체적 행동/상황, 시대/장소 힌트], {style_keywords} --ar 9:16 --v 6 --style raw
+
+【Midjourney 규칙】
+- 프롬프트는 영어로, 한 문단으로 작성 (줄바꿈 없음)
+- 핵심 키워드를 앞에 배치 (Midjourney는 앞쪽 키워드에 더 가중치)
+- 파라미터는 프롬프트 맨 뒤에 배치: --ar 9:16 --v 6 --style raw
+- 네거티브는 --no 파라미터로: --no {negative_keywords}
+- 간결할수록 좋음 (50단어 이내 권장)""",
+        "example": "A lonely lighthouse in a storm at night, Korean southern coast 1900s, watercolor illustration, soft warm tones, Ghibli inspired, gentle brush strokes --ar 9:16 --v 6 --style raw --no photorealistic, 3D render"
+    },
+    "Freepik (Flux)": {
+        "emoji": "🔵",
+        "desc": "40+ 모델 통합 플랫폼. 무료~월 $9",
+        "prompt_rule": """각 장면마다 Freepik AI (Flux 모델)용 영문 프롬프트를 생성하세요.
+
+【Freepik/Flux 프롬프트 형식】
+자연어 서술형으로 장면을 상세하게 묘사. 파라미터 없음.
+
+【Freepik/Flux 규칙】
+- 자연어 영어로, 2~3문장의 상세 서술 (Flux는 길고 구체적인 프롬프트에 잘 반응)
+- 첫 문장: 주요 피사체와 행동 묘사
+- 둘째 문장: 스타일, 색감, 분위기 묘사
+- 셋째 문장: 구도와 조명 지시 + "Vertical composition" 명시
+- Midjourney 파라미터(--ar, --v, --style, --no) 절대 사용 금지
+- 네거티브 프롬프트는 별도 필드가 있으므로, 메인 프롬프트에 "no ~" 문구 불포함
+- 비율(9:16)은 UI에서 별도 선택이므로 프롬프트에 포함하지 않음""",
+        "example": "A lonely lighthouse standing against a violent storm at night on the Korean southern coast in the early 1900s. Painted in watercolor illustration style with soft warm tones and gentle brush strokes, inspired by Studio Ghibli animation backgrounds. The lighthouse emits a warm orange glow through the rain. Atmospheric and melancholic mood with vertical composition."
+    },
+    "Leonardo.ai": {
+        "emoji": "🟠",
+        "desc": "파인튜닝 가능, 캐릭터 일관성. 무료~월 $10",
+        "prompt_rule": """각 장면마다 Leonardo.ai용 프롬프트를 생성하세요. 메인 프롬프트와 네거티브 프롬프트를 분리합니다.
+
+【Leonardo.ai 프롬프트 형식】
+image_prompt 필드에 메인 프롬프트만 작성.
+네거티브는 별도 필드 negative_prompt에 작성.
+
+【Leonardo.ai 규칙】
+- 메인 프롬프트: 핵심 묘사 위주, 1~2문장 (과도한 수식어 자제)
+- 스타일 프리셋이 있으므로 "watercolor style" 같은 기본 스타일 키워드만 포함
+- 네거티브 프롬프트: 쉼표로 구분된 키워드 나열
+- Midjourney 파라미터(--ar, --v, --style, --no) 절대 사용 금지
+- 비율(9:16)은 UI에서 선택이므로 프롬프트에 포함하지 않음
+- image_prompt와 negative_prompt를 JSON에서 분리해서 출력""",
+        "example": "Lonely lighthouse in a storm at night, Korean southern coast 1900s, warm orange glow, watercolor style, atmospheric, melancholic"
+    },
+    "Google ImageFX": {
+        "emoji": "🟢",
+        "desc": "완전 무료, Google 계정만 필요",
+        "prompt_rule": """각 장면마다 Google ImageFX용 영문 프롬프트를 생성하세요.
+
+【Google ImageFX 프롬프트 형식】
+간결한 자연어 서술. 파라미터 없음.
+
+【Google ImageFX 규칙】
+- 1~2문장의 간결하고 구체적인 묘사 (ImageFX는 짧은 프롬프트에 잘 반응)
+- 스타일 키워드를 문장 앞에 배치: "Watercolor illustration of..."
+- 파라미터, 네거티브, 비율 지정 모두 불가 — 순수 자연어만
+- Midjourney 문법(--ar, --v, --no) 절대 사용 금지
+- "9:16", "vertical", "portrait orientation" 같은 비율 텍스트도 불포함""",
+        "example": "Watercolor illustration of a lonely lighthouse in a storm at night. Korean southern coast, 1900s. Warm orange light glowing from the lighthouse. Soft brush strokes, muted colors, melancholic mood."
+    },
+    "DALL-E (ChatGPT)": {
+        "emoji": "⚪",
+        "desc": "ChatGPT Plus 포함, 자연어 최적화",
+        "prompt_rule": """각 장면마다 DALL-E용 영문 프롬프트를 생성하세요.
+
+【DALL-E 프롬프트 형식】
+상세한 자연어 서술. 구체적일수록 좋음.
+
+【DALL-E 규칙】
+- 2~3문장의 상세 서술 (DALL-E는 구체적 묘사에 강함)
+- 스타일, 분위기, 조명, 색감을 명시적으로 지정
+- "I NEED the image to be in 9:16 portrait orientation" 문구를 프롬프트 끝에 추가
+- Midjourney 파라미터(--ar, --v, --style, --no) 절대 사용 금지
+- 네거티브는 "Avoid: ~" 형태로 프롬프트 끝에 포함 가능""",
+        "example": "A lonely lighthouse standing against a violent storm at night on the Korean southern coast in the early 1900s, painted in watercolor illustration style with soft warm tones and gentle brush strokes inspired by Studio Ghibli. The lighthouse emits a warm orange glow through heavy rain, creating an atmospheric and melancholic mood. I NEED the image to be in 9:16 portrait orientation. Avoid: photorealistic, 3D render, neon colors."
+    },
+}
+
+
+def get_shorts_script_prompt(topic, category, tone, image_style, num_scenes, language_options, image_platform="Midjourney"):
     """숏츠 대본 + 이미지 프롬프트 + TTS 스크립트 통합 생성 프롬프트"""
 
     cat_info = SHORTS_CATEGORIES.get(category, SHORTS_CATEGORIES["역사 속 무명의 사람들"])
     tone_guide = SHORTS_TONES.get(tone, SHORTS_TONES["따뜻한 감성"])
     style_info = SHORTS_IMAGE_STYLES.get(image_style, SHORTS_IMAGE_STYLES["수채화/지브리풍"])
+    platform_info = SHORTS_IMAGE_PLATFORMS.get(image_platform, SHORTS_IMAGE_PLATFORMS["Midjourney"])
+
+    # 플랫폼별 프롬프트 규칙 생성
+    platform_prompt_rule = platform_info['prompt_rule'].format(
+        style_keywords=style_info['prompt_keywords'],
+        negative_keywords=style_info['negative']
+    )
 
     # 다국어 자막 지침
     lang_instruction = ""
@@ -576,25 +675,23 @@ def get_shorts_script_prompt(topic, category, tone, image_style, num_scenes, lan
 - 시대와 장소는 구체적으로, 인물은 익명으로
 
 ═══════════════════════════════════════
-🎨 이미지 프롬프트 규칙
+🎨 이미지 프롬프트 규칙 — {image_platform} 전용
 ═══════════════════════════════════════
 
-각 장면마다 Midjourney/DALL-E용 영문 프롬프트를 생성하세요.
+{platform_prompt_rule}
 
-【공통 스타일 키워드 (매 장면 필수 포함)】
+【공통 스타일 키워드 (참고용 — 플랫폼 문법에 맞게 자연스럽게 반영)】
 {style_info['prompt_keywords']}
 
-【공통 네거티브 (매 장면 필수 포함)】
+【네거티브 키워드 (참고용)】
 {style_info['negative']}
 
-【프롬프트 형식】
-[장면 묘사, 구체적 행동/상황, 시대/장소 힌트], {style_info['prompt_keywords']} --ar 9:16 --v 6
-
-【규칙】
+【공통 규칙】
 - 인물의 얼굴을 정면으로 묘사하지 않음 (뒷모습, 실루엣, 멀리서 본 모습)
 - 장면마다 조명/색감 변화로 감정 곡선을 표현
 - 고난 장면: 어두운 톤, 차가운 색감
 - 전환/결말: 따뜻한 톤, 골든아워 조명
+- 전체 장면에 걸쳐 동일한 스타일 키워드를 반복하여 시각적 일관성 유지
 
 ═══════════════════════════════════════
 🗣️ TTS 스크립트 규칙
@@ -647,6 +744,7 @@ def get_shorts_script_prompt(topic, category, tone, image_style, num_scenes, lan
     ],
     "safety_note": "이 대본의 역사적 정확성에 대한 종합 평가 한 줄"
   }},
+  "image_platform": "{image_platform}",
   "scenes": [
     {{
       "scene_number": 1,
@@ -656,12 +754,15 @@ def get_shorts_script_prompt(topic, category, tone, image_style, num_scenes, lan
       "narration_jp": "日本語ナレーション",
       "narration_zh": "中文旁白",
       "tts_script": "TTS 최적화된 한국어 텍스트 [2초 pause]",
-      "image_prompt": "Midjourney prompt in English --ar 9:16 --v 6",
+      "image_prompt": "{image_platform} 문법에 맞는 영문 프롬프트",
+      "negative_prompt": "네거티브 키워드 (Leonardo.ai인 경우만 포함, 그 외 플랫폼은 이 필드 생략)",
       "duration_sec": 7,
       "mood": "mysterious / warm / melancholic / hopeful 등"
     }}
   ]
 }}
 
+⚠️ 중요: image_prompt는 반드시 {image_platform} 문법에 맞게 작성하세요.
+{"Leonardo.ai인 경우 negative_prompt 필드를 반드시 포함하세요." if image_platform == "Leonardo.ai" else "negative_prompt 필드는 생략하세요."}
 다국어 자막 필드는 요청된 언어만 포함하세요.
 이제 숏츠 대본을 생성하세요."""
