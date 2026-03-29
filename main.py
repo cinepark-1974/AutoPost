@@ -858,27 +858,47 @@ def generate_english_rewrite(korean_content, keyword, category, api_key):
 # 🎬 숏츠 대본 생성
 # ═══════════════════════════════════════════════════════════════
 
-def generate_shorts_script(topic, category, tone, image_style, num_scenes, languages, api_key):
-    """숏츠 대본 + 이미지 프롬프트 + TTS 스크립트 통합 생성"""
+def generate_shorts_script(topic, category, tone, image_style, num_scenes, languages, api_key, use_web_search=True):
+    """숏츠 대본 + 이미지 프롬프트 + TTS 스크립트 통합 생성 (웹 검색 팩트 체크 포함)"""
     try:
         client = anthropic.Anthropic(api_key=api_key)
 
         prompt = get_shorts_script_prompt(topic, category, tone, image_style, num_scenes, languages)
 
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=8000,
-            temperature=0.7,
-            messages=[{"role": "user", "content": prompt}]
-        )
+        api_params = {
+            "model": "claude-sonnet-4-20250514",
+            "max_tokens": 8000,
+            "temperature": 0.7,
+            "messages": [{"role": "user", "content": prompt}]
+        }
 
-        # 응답 파싱
+        # 웹 검색 도구 추가
+        if use_web_search:
+            api_params["tools"] = [{
+                "type": "web_search_20250305",
+                "name": "web_search",
+                "max_uses": 5
+            }]
+
+        response = client.messages.create(**api_params)
+
+        # 응답 파싱 (웹 검색 결과 포함 처리)
         content_parts = []
+        search_count = 0
+
         for block in response.content:
             if block.type == "text":
                 content_parts.append(block.text)
+            elif block.type == "server_tool_use" and block.name == "web_search":
+                search_count += 1
 
         raw_content = "".join(content_parts)
+
+        # 웹 검색 사용 횟수 기록
+        web_search_used = 0
+        if hasattr(response, 'usage') and hasattr(response.usage, 'server_tool_use'):
+            if hasattr(response.usage.server_tool_use, 'web_search_requests'):
+                web_search_used = response.usage.server_tool_use.web_search_requests
 
         # JSON 추출 (마크다운 코드블록 제거)
         json_text = raw_content.strip()
@@ -891,7 +911,8 @@ def generate_shorts_script(topic, category, tone, image_style, num_scenes, langu
         return {
             "success": True,
             "data": parsed,
-            "raw": raw_content
+            "raw": raw_content,
+            "web_search_used": web_search_used
         }
 
     except json.JSONDecodeError as e:
@@ -1287,6 +1308,14 @@ with main_tab_shorts:
     if lang_jp: selected_languages.append("일본어")
     if lang_zh: selected_languages.append("중국어")
 
+    # 웹 검색 팩트 체크 토글
+    shorts_web_search = st.toggle(
+        "🔍 웹 검색 팩트 체크",
+        value=True,
+        help="역사적 사실(연도, 직업, 장소, 사건)을 웹 검색으로 검증합니다. 역사 소재일수록 반드시 켜두세요. (검색당 $0.01 추가)",
+        key="shorts_web_search"
+    )
+
     # 생성 버튼
     st.markdown("")
     shorts_generate_btn = st.button(
@@ -1307,11 +1336,13 @@ with main_tab_shorts:
         elif not selected_languages:
             st.error("⚠️ 자막 언어를 최소 1개 선택해주세요.")
         else:
-            with st.spinner("🎬 숏츠 대본 생성 중... (대본 + 이미지 프롬프트 + TTS + 자막)"):
+            search_msg = " (웹 검색 팩트 체크 ON)" if shorts_web_search else ""
+            with st.spinner(f"🎬 숏츠 대본 생성 중...{search_msg} (대본 + 이미지 프롬프트 + TTS + 자막)"):
                 shorts_result = generate_shorts_script(
                     shorts_topic, shorts_category, shorts_tone,
                     shorts_image_style, shorts_num_scenes,
-                    selected_languages, api
+                    selected_languages, api,
+                    use_web_search=shorts_web_search
                 )
             st.session_state['shorts_result'] = shorts_result
 
@@ -1335,15 +1366,54 @@ with main_tab_shorts:
             if data.get('description'):
                 st.caption(data['description'])
 
-            info_col1, info_col2 = st.columns(2)
+            info_col1, info_col2, info_col3 = st.columns(3)
             with info_col1:
                 st.metric("총 장면 수", f"{len(data.get('scenes', []))}장")
             with info_col2:
                 st.metric("예상 길이", f"{data.get('total_duration_sec', '?')}초")
+            with info_col3:
+                ws_count = shorts_result.get('web_search_used', 0)
+                if ws_count > 0:
+                    st.metric("웹 검색", f"{ws_count}회")
+                else:
+                    st.metric("웹 검색", "OFF")
 
             # 해시태그
             if data.get('hashtags'):
                 st.markdown(" ".join(data['hashtags']))
+
+            # ─── 🚨 팩트 체크 가이드 (최상단 표시) ───
+            fact_guide = data.get('fact_check_guide')
+            if fact_guide:
+                st.markdown("---")
+
+                # 안전도 평가
+                safety_note = fact_guide.get('safety_note', '')
+                if safety_note:
+                    st.info(f"🛡️ **팩트 체크 종합 평가:** {safety_note}")
+
+                fc_col1, fc_col2, fc_col3 = st.columns(3)
+
+                with fc_col1:
+                    verified = fact_guide.get('verified_facts', [])
+                    if verified:
+                        st.markdown("**✅ 검증된 팩트**")
+                        for v in verified:
+                            st.caption(f"• {v}")
+
+                with fc_col2:
+                    needs_check = fact_guide.get('needs_verification', [])
+                    if needs_check:
+                        st.markdown("**⚠️ 추가 확인 필요**")
+                        for n in needs_check:
+                            st.caption(f"• {n}")
+
+                with fc_col3:
+                    creative = fact_guide.get('creative_liberties', [])
+                    if creative:
+                        st.markdown("**🎭 창작 요소 (허구)**")
+                        for c in creative:
+                            st.caption(f"• {c}")
 
             st.markdown("---")
 
