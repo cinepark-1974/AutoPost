@@ -6,7 +6,7 @@ import json
 import re
 from prompts import (get_transaction_prompt, get_information_prompt, get_casual_prompt,
                      get_news_prompt, get_english_rewrite_prompt, get_shorts_script_prompt,
-                     SHORTS_CATEGORIES, SHORTS_TONES, SHORTS_IMAGE_STYLES)
+                     SHORTS_CATEGORIES, SHORTS_TONES, SHORTS_IMAGE_STYLES, SHORTS_IMAGE_PLATFORMS)
 
 # ═══════════════════════════════════════════════════════════════
 # 페이지 설정
@@ -858,12 +858,12 @@ def generate_english_rewrite(korean_content, keyword, category, api_key):
 # 🎬 숏츠 대본 생성
 # ═══════════════════════════════════════════════════════════════
 
-def generate_shorts_script(topic, category, tone, image_style, num_scenes, languages, api_key, use_web_search=True):
+def generate_shorts_script(topic, category, tone, image_style, num_scenes, languages, api_key, use_web_search=True, image_platform="Midjourney"):
     """숏츠 대본 + 이미지 프롬프트 + TTS 스크립트 통합 생성 (웹 검색 팩트 체크 포함)"""
     try:
         client = anthropic.Anthropic(api_key=api_key)
 
-        prompt = get_shorts_script_prompt(topic, category, tone, image_style, num_scenes, languages)
+        prompt = get_shorts_script_prompt(topic, category, tone, image_style, num_scenes, languages, image_platform)
 
         api_params = {
             "model": "claude-sonnet-4-20250514",
@@ -1290,6 +1290,18 @@ with main_tab_shorts:
             key="shorts_num_scenes"
         )
 
+    # 이미지 생성 플랫폼 선택
+    st.markdown("**🖼️ 이미지 생성 플랫폼**")
+    platform_options = list(SHORTS_IMAGE_PLATFORMS.keys())
+    shorts_platform = st.selectbox(
+        "플랫폼",
+        platform_options,
+        index=1,  # 기본값: Freepik (Flux)
+        format_func=lambda x: f"{SHORTS_IMAGE_PLATFORMS[x]['emoji']} {x} — {SHORTS_IMAGE_PLATFORMS[x]['desc']}",
+        key="shorts_platform",
+        label_visibility="collapsed"
+    )
+
     # 다국어 자막 선택
     st.markdown("**🌐 다국어 자막**")
     lang_cols = st.columns(4)
@@ -1337,12 +1349,13 @@ with main_tab_shorts:
             st.error("⚠️ 자막 언어를 최소 1개 선택해주세요.")
         else:
             search_msg = " (웹 검색 팩트 체크 ON)" if shorts_web_search else ""
-            with st.spinner(f"🎬 숏츠 대본 생성 중...{search_msg} (대본 + 이미지 프롬프트 + TTS + 자막)"):
+            with st.spinner(f"🎬 숏츠 대본 생성 중...{search_msg} (대본 + {shorts_platform} 프롬프트 + TTS + 자막)"):
                 shorts_result = generate_shorts_script(
                     shorts_topic, shorts_category, shorts_tone,
                     shorts_image_style, shorts_num_scenes,
                     selected_languages, api,
-                    use_web_search=shorts_web_search
+                    use_web_search=shorts_web_search,
+                    image_platform=shorts_platform
                 )
             st.session_state['shorts_result'] = shorts_result
 
@@ -1441,20 +1454,28 @@ with main_tab_shorts:
                             st.caption(f"EN: {scene['narration_en']}")
 
             with scene_tab2:
-                st.caption("아래 프롬프트를 Midjourney 또는 DALL-E에 그대로 복사하세요.")
+                used_platform = data.get('image_platform', '플랫폼 미지정')
+                st.caption(f"🖼️ **{used_platform}** 전용 프롬프트입니다. 해당 플랫폼에 그대로 복사하세요.")
                 for scene in scenes:
                     st.markdown(f"**장면 #{scene.get('scene_number', '?')} ({scene.get('scene_role', '')})**")
                     st.code(scene.get('image_prompt', ''), language="text")
+                    # Leonardo.ai 네거티브 프롬프트 표시
+                    if scene.get('negative_prompt'):
+                        st.caption(f"🚫 Negative: `{scene['negative_prompt']}`")
 
                 # 전체 이미지 프롬프트 다운로드
-                all_prompts = "\n\n".join([
-                    f"=== Scene #{s.get('scene_number', '?')} ({s.get('scene_role', '')}) ===\n{s.get('image_prompt', '')}"
-                    for s in scenes
-                ])
+                all_prompts_parts = []
+                for s in scenes:
+                    part = f"=== Scene #{s.get('scene_number', '?')} ({s.get('scene_role', '')}) ===\n{s.get('image_prompt', '')}"
+                    if s.get('negative_prompt'):
+                        part += f"\n[Negative] {s['negative_prompt']}"
+                    all_prompts_parts.append(part)
+                all_prompts = "\n\n".join(all_prompts_parts)
+
                 st.download_button(
                     "💾 이미지 프롬프트 전체 다운로드",
                     all_prompts,
-                    f"shorts_image_prompts.txt",
+                    f"shorts_image_prompts_{used_platform.replace(' ', '_')}.txt",
                     mime="text/plain",
                     use_container_width=True,
                     key="dl_img_prompts"
