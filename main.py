@@ -4,14 +4,16 @@ import requests
 from datetime import datetime, timedelta
 import json
 import re
-from prompts import get_transaction_prompt, get_information_prompt, get_casual_prompt, get_news_prompt, get_english_rewrite_prompt
+from prompts import (get_transaction_prompt, get_information_prompt, get_casual_prompt,
+                     get_news_prompt, get_english_rewrite_prompt, get_shorts_script_prompt,
+                     SHORTS_CATEGORIES, SHORTS_TONES, SHORTS_IMAGE_STYLES)
 
 # ═══════════════════════════════════════════════════════════════
 # 페이지 설정
 # ═══════════════════════════════════════════════════════════════
 
 st.set_page_config(
-    page_title="AutoPost v10.1",
+    page_title="AutoPost v11.0",
     page_icon="✍️",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -27,6 +29,8 @@ if 'selected_keyword' not in st.session_state:
     st.session_state['selected_keyword'] = ''
 if 'generated_result' not in st.session_state:
     st.session_state['generated_result'] = None
+if 'shorts_result' not in st.session_state:
+    st.session_state['shorts_result'] = None
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -851,11 +855,65 @@ def generate_english_rewrite(korean_content, keyword, category, api_key):
 
 
 # ═══════════════════════════════════════════════════════════════
+# 🎬 숏츠 대본 생성
+# ═══════════════════════════════════════════════════════════════
+
+def generate_shorts_script(topic, category, tone, image_style, num_scenes, languages, api_key):
+    """숏츠 대본 + 이미지 프롬프트 + TTS 스크립트 통합 생성"""
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+
+        prompt = get_shorts_script_prompt(topic, category, tone, image_style, num_scenes, languages)
+
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=8000,
+            temperature=0.7,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        # 응답 파싱
+        content_parts = []
+        for block in response.content:
+            if block.type == "text":
+                content_parts.append(block.text)
+
+        raw_content = "".join(content_parts)
+
+        # JSON 추출 (마크다운 코드블록 제거)
+        json_text = raw_content.strip()
+        if json_text.startswith("```"):
+            json_text = re.sub(r'^```(?:json)?\s*', '', json_text)
+            json_text = re.sub(r'\s*```$', '', json_text)
+
+        parsed = json.loads(json_text)
+
+        return {
+            "success": True,
+            "data": parsed,
+            "raw": raw_content
+        }
+
+    except json.JSONDecodeError as e:
+        return {
+            "success": False,
+            "error": f"❌ JSON 파싱 실패: {str(e)}",
+            "raw": raw_content if 'raw_content' in dir() else ""
+        }
+    except anthropic.AuthenticationError:
+        return {"success": False, "error": "❌ API 키가 올바르지 않습니다."}
+    except anthropic.RateLimitError:
+        return {"success": False, "error": "❌ API 호출 한도 초과. 잠시 후 다시 시도해주세요."}
+    except Exception as e:
+        return {"success": False, "error": f"❌ 숏츠 대본 생성 실패: {str(e)}"}
+
+
+# ═══════════════════════════════════════════════════════════════
 # UI 시작
 # ═══════════════════════════════════════════════════════════════
 
-st.title("✍️ AutoPost v10.1")
-st.caption("네이버 블로그 SEO 최적화 · 타입별 맞춤 · 웹 검색 팩트 체크 · CINEPARK")
+st.title("✍️ AutoPost v11.0")
+st.caption("네이버 블로그 SEO 최적화 · 타입별 맞춤 · 웹 검색 팩트 체크 · 🎬 숏츠 대본 · CINEPARK")
 
 # ───────────────────────────────────────
 # API 키 설정
@@ -873,287 +931,546 @@ with st.expander("🔑 API 설정"):
 
 st.markdown("---")
 
-# ───────────────────────────────────────
-# 키워드 소스 (트렌드 + 뉴스)
-# ───────────────────────────────────────
-with st.expander("🔥 키워드 소스", expanded=False):
-    tab_trend, tab_news = st.tabs(["💎 추천 키워드", "📰 최신 뉴스"])
+# ═══════════════════════════════════════════════════════════════
+# 메인 탭: 블로그 포스트 / 숏츠 대본
+# ═══════════════════════════════════════════════════════════════
 
-    # 탭 1: 추천 키워드
-    with tab_trend:
-        trend_cat = st.selectbox(
-            "카테고리 선택",
-            ["영화", "IT", "여행", "맛집", "경제", "일상", "OTT", "음악"],
-            key="trend_cat"
-        )
-        keywords_list = get_trending_keywords(trend_cat)
+main_tab_blog, main_tab_shorts = st.tabs(["✍️ 블로그 포스트", "🎬 숏츠 대본"])
 
-        cols = st.columns(2)
-        for idx, kw in enumerate(keywords_list):
-            with cols[idx % 2]:
-                if st.button(f"⭐ {kw}", key=f"trend_{idx}", use_container_width=True):
-                    st.session_state['selected_keyword'] = kw
-                    st.rerun()
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 탭 1: 블로그 포스트 (기존 기능)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+with main_tab_blog:
+    with st.expander("🔥 키워드 소스", expanded=False):
+        tab_trend, tab_news = st.tabs(["💎 추천 키워드", "📰 최신 뉴스"])
 
-    # 탭 2: 최신 뉴스 (복원!)
-    with tab_news:
-        news_col1, news_col2 = st.columns([3, 1])
-        with news_col1:
-            news_query = st.text_input(
-                "뉴스 검색어",
-                placeholder="예: 넷플릭스 신작, 영화 할인, AI 뉴스",
-                key="news_query"
+        # 탭 1: 추천 키워드
+        with tab_trend:
+            trend_cat = st.selectbox(
+                "카테고리 선택",
+                ["영화", "IT", "여행", "맛집", "경제", "일상", "OTT", "음악"],
+                key="trend_cat"
             )
-        with news_col2:
-            st.markdown("<br>", unsafe_allow_html=True)
-            search_news_btn = st.button("🔍 검색", key="search_news", use_container_width=True)
+            keywords_list = get_trending_keywords(trend_cat)
 
-        if search_news_btn and news_query:
-            with st.spinner("뉴스 검색 중..."):
-                news_results = search_latest_news(news_query, count=5)
-
-            if news_results:
-                for idx, news in enumerate(news_results):
-                    col_title, col_btn = st.columns([4, 1])
-                    with col_title:
-                        st.markdown(f"📌 **{news['title']}**")
-                    with col_btn:
-                        if st.button("선택", key=f"news_{idx}"):
-                            st.session_state['selected_keyword'] = news['title']
-                            st.rerun()
-            else:
-                st.warning("검색 결과가 없습니다. 다른 검색어를 시도해보세요.")
-
-st.markdown("---")
-
-# ───────────────────────────────────────
-# 글 생성 메인 영역
-# ───────────────────────────────────────
-st.markdown("## 🚀 글 생성")
-
-default_keyword = st.session_state.get('selected_keyword', '')
-
-col_main, col_side = st.columns([2, 1])
-
-with col_main:
-    keyword = st.text_input(
-        "키워드",
-        value=default_keyword,
-        placeholder="예: 무료 AI 툴 베스트 20, CGV 할인, 오늘 날씨",
-        help="키워드를 입력하면 자동으로 타입(거래/정보/일상/뉴스)이 판별됩니다."
-    )
-
-    # 타입 자동 판별 표시
-    if keyword and len(keyword) > 1:
-        keyword_type = classify_keyword_type(keyword)
-        type_info = get_type_display(keyword_type)
-        st.info(f"{type_info['emoji']} **{type_info['name']}** 판별 — {type_info['desc']}")
-
-    # 롱테일 키워드 제안
-    if keyword and len(keyword) > 1:
-        with st.expander("💡 롱테일 키워드 제안"):
-            longtail = generate_longtail_keywords(keyword)
-            lt_cols = st.columns(3)
-            for idx, ltk in enumerate(longtail[:12]):
-                with lt_cols[idx % 3]:
-                    if st.button(f"📌 {ltk}", key=f"lt_{idx}", use_container_width=True):
-                        st.session_state['selected_keyword'] = ltk
+            cols = st.columns(2)
+            for idx, kw in enumerate(keywords_list):
+                with cols[idx % 2]:
+                    if st.button(f"⭐ {kw}", key=f"trend_{idx}", use_container_width=True):
+                        st.session_state['selected_keyword'] = kw
                         st.rerun()
 
-with col_side:
-    category = st.selectbox(
-        "카테고리",
-        ["영화", "IT", "여행", "맛집", "경제", "일상", "OTT", "음악"],
-        help="카테고리에 따라 페르소나와 연결 문구가 달라집니다."
-    )
-    word_count = st.slider("목표 글자수", 1500, 3000, 2000, step=100)
-    use_web_search = st.toggle("🔍 웹 검색 팩트 체크", value=True, help="AI가 글 생성 시 웹 검색으로 팩트를 확인합니다. 영화/OTT 정보의 정확성이 크게 향상됩니다. (검색당 $0.01 추가)")
+        # 탭 2: 최신 뉴스 (복원!)
+        with tab_news:
+            news_col1, news_col2 = st.columns([3, 1])
+            with news_col1:
+                news_query = st.text_input(
+                    "뉴스 검색어",
+                    placeholder="예: 넷플릭스 신작, 영화 할인, AI 뉴스",
+                    key="news_query"
+                )
+            with news_col2:
+                st.markdown("<br>", unsafe_allow_html=True)
+                search_news_btn = st.button("🔍 검색", key="search_news", use_container_width=True)
 
-    # 현재 페르소나 미리보기
-    if category:
-        persona_preview = get_persona(category)
-        st.caption(f"🎭 \"{persona_preview['connection']}\"")
+            if search_news_btn and news_query:
+                with st.spinner("뉴스 검색 중..."):
+                    news_results = search_latest_news(news_query, count=5)
 
-# 생성 버튼
-st.markdown("")
-generate_btn = st.button("✨ 블로그 포스트 생성", type="primary", use_container_width=True)
-
-# ───────────────────────────────────────
-# 생성 실행 & 결과 표시
-# ───────────────────────────────────────
-if generate_btn:
-    api = load_api_key() or api_key_input
-
-    if not api:
-        st.error("⚠️ API 키를 입력해주세요.")
-    elif not keyword or len(keyword) < 2:
-        st.error("⚠️ 키워드를 2자 이상 입력해주세요.")
-    else:
-        keyword_type = classify_keyword_type(keyword)
-        type_info = get_type_display(keyword_type)
-
-        with st.spinner(f"{type_info['emoji']} {type_info['name']} 포스트 생성 중... {'(웹 검색 팩트 체크 ON)' if use_web_search else ''}"):
-            result = generate_blog_post(keyword, category, word_count, api, use_web_search=use_web_search)
-
-        st.session_state['generated_result'] = result
-
-# 결과 표시 (세션에 저장된 결과)
-result = st.session_state.get('generated_result')
-
-if result:
-    if "error" in result:
-        st.error(result['error'])
-    else:
-        st.markdown("---")
-
-        # SEO 점수 헤더
-        score = result['seo_score']
-        kw_type = result.get('keyword_type', 'information')
-        type_info = get_type_display(kw_type)
-
-        score_col, info_col = st.columns([1, 2])
-        with score_col:
-            if score >= 85:
-                st.success(f"🏆 SEO {score}/100점")
-            elif score >= 70:
-                st.warning(f"⚠️ SEO {score}/100점")
-            else:
-                st.error(f"❌ SEO {score}/100점")
-
-        with info_col:
-            st.markdown(f"**{type_info['emoji']} {type_info['name']}** | 시도 {result['attempts']}회")
-            if result.get('web_search_used', 0) > 0:
-                st.caption(f"🔍 웹 검색 {result['web_search_used']}회 수행 (팩트 체크 완료)")
-            if result.get('warning'):
-                st.caption(result['warning'])
-
-        # SEO 피드백 상세
-        with st.expander("📊 SEO 분석 상세", expanded=False):
-            for fb in result['feedback']:
-                st.text(fb)
-
-            if result['improvements']:
-                st.markdown("**💡 개선 제안:**")
-                for imp in result['improvements']:
-                    st.text(f"  → {imp}")
-
-        # 본문 미리보기
-        st.markdown("### 📝 생성 결과")
-        st.markdown(result['content'])
-
-        # 다운로드 & 복사
-        st.markdown("---")
-        dl_col1, dl_col2 = st.columns(2)
-        with dl_col1:
-            filename = keyword.replace(" ", "_")
-            st.download_button(
-                "💾 TXT 다운로드",
-                result['content'],
-                f"{filename}.txt",
-                mime="text/plain",
-                use_container_width=True
-            )
-        with dl_col2:
-            # 히스토리에 추가
-            if st.button("📋 히스토리에 저장", use_container_width=True):
-                st.session_state['post_history'].append({
-                    "keyword": keyword,
-                    "type": kw_type,
-                    "score": score,
-                    "title": result['title'],
-                    "time": datetime.now().strftime("%H:%M")
-                })
-                st.success("히스토리에 저장했습니다!")
-
-        # ───────────────────────────────────────
-        # 🌐 영어 리라이트 섹션
-        # ───────────────────────────────────────
-        st.markdown("---")
-        st.markdown("### 🌐 English Rewrite for Google Blog")
-        st.caption("한국어 포스트를 영어권 독자용으로 완전 재구성합니다. (번역이 아닌 리라이트)")
-
-        eng_col1, eng_col2 = st.columns([3, 1])
-        with eng_col1:
-            eng_keyword = st.text_input(
-                "영어 키워드 (구글 SEO용)",
-                value="",
-                placeholder="예: Korean box office record, Netflix K-drama, K-Content analysis",
-                key="eng_keyword"
-            )
-        with eng_col2:
-            eng_category = st.selectbox(
-                "영어 카테고리",
-                ["K-Cinema", "K-Drama", "OTT", "Entertainment", "Industry"],
-                key="eng_category"
-            )
-
-        if st.button("🌐 영어 리라이트 생성", use_container_width=True):
-            api = load_api_key() or api_key_input
-            if not api:
-                st.error("⚠️ API 키를 입력해주세요.")
-            elif not eng_keyword:
-                st.error("⚠️ 영어 키워드를 입력해주세요.")
-            else:
-                with st.spinner("🌐 영어 리라이트 생성 중... (웹 검색 팩트 체크 포함)"):
-                    eng_result = generate_english_rewrite(
-                        result['content'], eng_keyword, eng_category, api
-                    )
-
-                if eng_result.get("success"):
-                    st.markdown("---")
-                    if eng_result.get('web_search_used', 0) > 0:
-                        st.caption(f"🔍 웹 검색 {eng_result['web_search_used']}회 수행")
-
-                    # 미리보기 / HTML 탭
-                    eng_tab1, eng_tab2 = st.tabs(["📝 미리보기", "🔧 Blogger HTML"])
-
-                    with eng_tab1:
-                        st.markdown("### 🌐 English Version")
-                        st.markdown(eng_result['content'])
-
-                    with eng_tab2:
-                        st.markdown("### 🔧 Blogger HTML (복사해서 붙여넣기)")
-                        st.code(eng_result.get('html_content', ''), language="html")
-                        st.caption("Blogger > 새 게시물 > HTML 보기에서 이 코드를 붙여넣으세요.")
-
-                    # 다운로드 버튼
-                    eng_dl1, eng_dl2 = st.columns(2)
-                    eng_filename = eng_keyword.replace(" ", "_")
-                    with eng_dl1:
-                        st.download_button(
-                            "💾 TXT 다운로드",
-                            eng_result['content'],
-                            f"{eng_filename}_EN.txt",
-                            mime="text/plain",
-                            use_container_width=True,
-                            key="eng_txt_dl"
-                        )
-                    with eng_dl2:
-                        st.download_button(
-                            "💾 HTML 다운로드 (Blogger용)",
-                            eng_result.get('html_content', ''),
-                            f"{eng_filename}_EN.html",
-                            mime="text/html",
-                            use_container_width=True,
-                            key="eng_html_dl"
-                        )
+                if news_results:
+                    for idx, news in enumerate(news_results):
+                        col_title, col_btn = st.columns([4, 1])
+                        with col_title:
+                            st.markdown(f"📌 **{news['title']}**")
+                        with col_btn:
+                            if st.button("선택", key=f"news_{idx}"):
+                                st.session_state['selected_keyword'] = news['title']
+                                st.rerun()
                 else:
-                    st.error(eng_result.get('error', '영어 리라이트 생성 실패'))
+                    st.warning("검색 결과가 없습니다. 다른 검색어를 시도해보세요.")
 
-# ───────────────────────────────────────
-# 히스토리
-# ───────────────────────────────────────
-if st.session_state['post_history']:
     st.markdown("---")
-    with st.expander(f"📚 생성 히스토리 ({len(st.session_state['post_history'])}건)"):
-        for idx, item in enumerate(reversed(st.session_state['post_history'])):
-            type_info = get_type_display(item['type'])
-            st.text(
-                f"{item['time']} | {type_info['emoji']} {item['score']}점 | {item['keyword']}"
+
+    # ───────────────────────────────────────
+    # 글 생성 메인 영역
+    # ───────────────────────────────────────
+    st.markdown("## 🚀 글 생성")
+
+    default_keyword = st.session_state.get('selected_keyword', '')
+
+    col_main, col_side = st.columns([2, 1])
+
+    with col_main:
+        keyword = st.text_input(
+            "키워드",
+            value=default_keyword,
+            placeholder="예: 무료 AI 툴 베스트 20, CGV 할인, 오늘 날씨",
+            help="키워드를 입력하면 자동으로 타입(거래/정보/일상/뉴스)이 판별됩니다."
+        )
+
+        # 타입 자동 판별 표시
+        if keyword and len(keyword) > 1:
+            keyword_type = classify_keyword_type(keyword)
+            type_info = get_type_display(keyword_type)
+            st.info(f"{type_info['emoji']} **{type_info['name']}** 판별 — {type_info['desc']}")
+
+        # 롱테일 키워드 제안
+        if keyword and len(keyword) > 1:
+            with st.expander("💡 롱테일 키워드 제안"):
+                longtail = generate_longtail_keywords(keyword)
+                lt_cols = st.columns(3)
+                for idx, ltk in enumerate(longtail[:12]):
+                    with lt_cols[idx % 3]:
+                        if st.button(f"📌 {ltk}", key=f"lt_{idx}", use_container_width=True):
+                            st.session_state['selected_keyword'] = ltk
+                            st.rerun()
+
+    with col_side:
+        category = st.selectbox(
+            "카테고리",
+            ["영화", "IT", "여행", "맛집", "경제", "일상", "OTT", "음악"],
+            help="카테고리에 따라 페르소나와 연결 문구가 달라집니다."
+        )
+        word_count = st.slider("목표 글자수", 1500, 3000, 2000, step=100)
+        use_web_search = st.toggle("🔍 웹 검색 팩트 체크", value=True, help="AI가 글 생성 시 웹 검색으로 팩트를 확인합니다. 영화/OTT 정보의 정확성이 크게 향상됩니다. (검색당 $0.01 추가)")
+
+        # 현재 페르소나 미리보기
+        if category:
+            persona_preview = get_persona(category)
+            st.caption(f"🎭 \"{persona_preview['connection']}\"")
+
+    # 생성 버튼
+    st.markdown("")
+    generate_btn = st.button("✨ 블로그 포스트 생성", type="primary", use_container_width=True)
+
+    # ───────────────────────────────────────
+    # 생성 실행 & 결과 표시
+    # ───────────────────────────────────────
+    if generate_btn:
+        api = load_api_key() or api_key_input
+
+        if not api:
+            st.error("⚠️ API 키를 입력해주세요.")
+        elif not keyword or len(keyword) < 2:
+            st.error("⚠️ 키워드를 2자 이상 입력해주세요.")
+        else:
+            keyword_type = classify_keyword_type(keyword)
+            type_info = get_type_display(keyword_type)
+
+            with st.spinner(f"{type_info['emoji']} {type_info['name']} 포스트 생성 중... {'(웹 검색 팩트 체크 ON)' if use_web_search else ''}"):
+                result = generate_blog_post(keyword, category, word_count, api, use_web_search=use_web_search)
+
+            st.session_state['generated_result'] = result
+
+    # 결과 표시 (세션에 저장된 결과)
+    result = st.session_state.get('generated_result')
+
+    if result:
+        if "error" in result:
+            st.error(result['error'])
+        else:
+            st.markdown("---")
+
+            # SEO 점수 헤더
+            score = result['seo_score']
+            kw_type = result.get('keyword_type', 'information')
+            type_info = get_type_display(kw_type)
+
+            score_col, info_col = st.columns([1, 2])
+            with score_col:
+                if score >= 85:
+                    st.success(f"🏆 SEO {score}/100점")
+                elif score >= 70:
+                    st.warning(f"⚠️ SEO {score}/100점")
+                else:
+                    st.error(f"❌ SEO {score}/100점")
+
+            with info_col:
+                st.markdown(f"**{type_info['emoji']} {type_info['name']}** | 시도 {result['attempts']}회")
+                if result.get('web_search_used', 0) > 0:
+                    st.caption(f"🔍 웹 검색 {result['web_search_used']}회 수행 (팩트 체크 완료)")
+                if result.get('warning'):
+                    st.caption(result['warning'])
+
+            # SEO 피드백 상세
+            with st.expander("📊 SEO 분석 상세", expanded=False):
+                for fb in result['feedback']:
+                    st.text(fb)
+
+                if result['improvements']:
+                    st.markdown("**💡 개선 제안:**")
+                    for imp in result['improvements']:
+                        st.text(f"  → {imp}")
+
+            # 본문 미리보기
+            st.markdown("### 📝 생성 결과")
+            st.markdown(result['content'])
+
+            # 다운로드 & 복사
+            st.markdown("---")
+            dl_col1, dl_col2 = st.columns(2)
+            with dl_col1:
+                filename = keyword.replace(" ", "_")
+                st.download_button(
+                    "💾 TXT 다운로드",
+                    result['content'],
+                    f"{filename}.txt",
+                    mime="text/plain",
+                    use_container_width=True
+                )
+            with dl_col2:
+                # 히스토리에 추가
+                if st.button("📋 히스토리에 저장", use_container_width=True):
+                    st.session_state['post_history'].append({
+                        "keyword": keyword,
+                        "type": kw_type,
+                        "score": score,
+                        "title": result['title'],
+                        "time": datetime.now().strftime("%H:%M")
+                    })
+                    st.success("히스토리에 저장했습니다!")
+
+            # ───────────────────────────────────────
+            # 🌐 영어 리라이트 섹션
+            # ───────────────────────────────────────
+            st.markdown("---")
+            st.markdown("### 🌐 English Rewrite for Google Blog")
+            st.caption("한국어 포스트를 영어권 독자용으로 완전 재구성합니다. (번역이 아닌 리라이트)")
+
+            eng_col1, eng_col2 = st.columns([3, 1])
+            with eng_col1:
+                eng_keyword = st.text_input(
+                    "영어 키워드 (구글 SEO용)",
+                    value="",
+                    placeholder="예: Korean box office record, Netflix K-drama, K-Content analysis",
+                    key="eng_keyword"
+                )
+            with eng_col2:
+                eng_category = st.selectbox(
+                    "영어 카테고리",
+                    ["K-Cinema", "K-Drama", "OTT", "Entertainment", "Industry"],
+                    key="eng_category"
+                )
+
+            if st.button("🌐 영어 리라이트 생성", use_container_width=True):
+                api = load_api_key() or api_key_input
+                if not api:
+                    st.error("⚠️ API 키를 입력해주세요.")
+                elif not eng_keyword:
+                    st.error("⚠️ 영어 키워드를 입력해주세요.")
+                else:
+                    with st.spinner("🌐 영어 리라이트 생성 중... (웹 검색 팩트 체크 포함)"):
+                        eng_result = generate_english_rewrite(
+                            result['content'], eng_keyword, eng_category, api
+                        )
+
+                    if eng_result.get("success"):
+                        st.markdown("---")
+                        if eng_result.get('web_search_used', 0) > 0:
+                            st.caption(f"🔍 웹 검색 {eng_result['web_search_used']}회 수행")
+
+                        # 미리보기 / HTML 탭
+                        eng_tab1, eng_tab2 = st.tabs(["📝 미리보기", "🔧 Blogger HTML"])
+
+                        with eng_tab1:
+                            st.markdown("### 🌐 English Version")
+                            st.markdown(eng_result['content'])
+
+                        with eng_tab2:
+                            st.markdown("### 🔧 Blogger HTML (복사해서 붙여넣기)")
+                            st.code(eng_result.get('html_content', ''), language="html")
+                            st.caption("Blogger > 새 게시물 > HTML 보기에서 이 코드를 붙여넣으세요.")
+
+                        # 다운로드 버튼
+                        eng_dl1, eng_dl2 = st.columns(2)
+                        eng_filename = eng_keyword.replace(" ", "_")
+                        with eng_dl1:
+                            st.download_button(
+                                "💾 TXT 다운로드",
+                                eng_result['content'],
+                                f"{eng_filename}_EN.txt",
+                                mime="text/plain",
+                                use_container_width=True,
+                                key="eng_txt_dl"
+                            )
+                        with eng_dl2:
+                            st.download_button(
+                                "💾 HTML 다운로드 (Blogger용)",
+                                eng_result.get('html_content', ''),
+                                f"{eng_filename}_EN.html",
+                                mime="text/html",
+                                use_container_width=True,
+                                key="eng_html_dl"
+                            )
+                    else:
+                        st.error(eng_result.get('error', '영어 리라이트 생성 실패'))
+
+    # ───────────────────────────────────────
+    # 히스토리
+    # ───────────────────────────────────────
+    if st.session_state['post_history']:
+        st.markdown("---")
+        with st.expander(f"📚 생성 히스토리 ({len(st.session_state['post_history'])}건)"):
+            for idx, item in enumerate(reversed(st.session_state['post_history'])):
+                type_info = get_type_display(item['type'])
+                st.text(
+                    f"{item['time']} | {type_info['emoji']} {item['score']}점 | {item['keyword']}"
+                )
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 탭 2: 🎬 숏츠 대본
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+with main_tab_shorts:
+    st.markdown("## 🎬 숏츠 대본 생성기")
+    st.caption("성장서사 기반 유튜브 숏츠 · 대본 + 이미지 프롬프트 + TTS 스크립트 + 다국어 자막")
+
+    st.markdown("---")
+
+    # ─── 입력 영역 ───
+    shorts_col1, shorts_col2 = st.columns([2, 1])
+
+    with shorts_col1:
+        shorts_topic = st.text_input(
+            "주제 / 소재",
+            placeholder="예: 1900년대 남해 등대지기, 조선시대 과거시험 7번 낙방한 선비",
+            help="저작권·초상권 프리를 위해 실존 인물 이름은 피해주세요.",
+            key="shorts_topic"
+        )
+
+        shorts_category = st.selectbox(
+            "카테고리",
+            list(SHORTS_CATEGORIES.keys()),
+            format_func=lambda x: f"{SHORTS_CATEGORIES[x]['emoji']} {x}",
+            key="shorts_category"
+        )
+
+        # 카테고리 설명 & 예시
+        if shorts_category:
+            cat_info = SHORTS_CATEGORIES[shorts_category]
+            st.caption(f"{cat_info['desc']} — 예시: {', '.join(cat_info['examples'][:4])}")
+
+    with shorts_col2:
+        shorts_tone = st.selectbox(
+            "나레이션 톤",
+            list(SHORTS_TONES.keys()),
+            key="shorts_tone"
+        )
+
+        shorts_image_style = st.selectbox(
+            "이미지 스타일",
+            list(SHORTS_IMAGE_STYLES.keys()),
+            key="shorts_image_style"
+        )
+
+        shorts_num_scenes = st.slider(
+            "장면 수",
+            min_value=6, max_value=10, value=8,
+            help="6~8장이 숏츠 최적 (50~60초)",
+            key="shorts_num_scenes"
+        )
+
+    # 다국어 자막 선택
+    st.markdown("**🌐 다국어 자막**")
+    lang_cols = st.columns(4)
+    with lang_cols[0]:
+        lang_ko = st.checkbox("한국어", value=True, key="lang_ko")
+    with lang_cols[1]:
+        lang_en = st.checkbox("영어", value=True, key="lang_en")
+    with lang_cols[2]:
+        lang_jp = st.checkbox("일본어", value=True, key="lang_jp")
+    with lang_cols[3]:
+        lang_zh = st.checkbox("중국어", value=False, key="lang_zh")
+
+    selected_languages = []
+    if lang_ko: selected_languages.append("한국어")
+    if lang_en: selected_languages.append("영어")
+    if lang_jp: selected_languages.append("일본어")
+    if lang_zh: selected_languages.append("중국어")
+
+    # 생성 버튼
+    st.markdown("")
+    shorts_generate_btn = st.button(
+        "🎬 숏츠 대본 생성",
+        type="primary",
+        use_container_width=True,
+        key="shorts_generate"
+    )
+
+    # ─── 생성 실행 ───
+    if shorts_generate_btn:
+        api = load_api_key() or api_key_input
+
+        if not api:
+            st.error("⚠️ API 키를 입력해주세요.")
+        elif not shorts_topic or len(shorts_topic) < 3:
+            st.error("⚠️ 주제를 3자 이상 입력해주세요.")
+        elif not selected_languages:
+            st.error("⚠️ 자막 언어를 최소 1개 선택해주세요.")
+        else:
+            with st.spinner("🎬 숏츠 대본 생성 중... (대본 + 이미지 프롬프트 + TTS + 자막)"):
+                shorts_result = generate_shorts_script(
+                    shorts_topic, shorts_category, shorts_tone,
+                    shorts_image_style, shorts_num_scenes,
+                    selected_languages, api
+                )
+            st.session_state['shorts_result'] = shorts_result
+
+    # ─── 결과 표시 ───
+    shorts_result = st.session_state.get('shorts_result')
+
+    if shorts_result:
+        if not shorts_result.get('success'):
+            st.error(shorts_result.get('error', '알 수 없는 오류'))
+            if shorts_result.get('raw'):
+                with st.expander("🔧 원본 응답 (디버그)"):
+                    st.code(shorts_result['raw'], language="json")
+        else:
+            data = shorts_result['data']
+            st.markdown("---")
+
+            # 제목 & 정보
+            st.markdown(f"### 🎬 {data.get('title', '제목 없음')}")
+            if data.get('title_en'):
+                st.caption(f"EN: {data['title_en']}")
+            if data.get('description'):
+                st.caption(data['description'])
+
+            info_col1, info_col2 = st.columns(2)
+            with info_col1:
+                st.metric("총 장면 수", f"{len(data.get('scenes', []))}장")
+            with info_col2:
+                st.metric("예상 길이", f"{data.get('total_duration_sec', '?')}초")
+
+            # 해시태그
+            if data.get('hashtags'):
+                st.markdown(" ".join(data['hashtags']))
+
+            st.markdown("---")
+
+            # 장면별 상세
+            scenes = data.get('scenes', [])
+
+            # 탭: 스토리보드 / 이미지 프롬프트 / TTS 스크립트 / 다국어 자막
+            scene_tab1, scene_tab2, scene_tab3, scene_tab4 = st.tabs([
+                "📖 스토리보드", "🎨 이미지 프롬프트", "🗣️ TTS 스크립트", "🌐 다국어 자막"
+            ])
+
+            with scene_tab1:
+                for scene in scenes:
+                    role_emoji = {
+                        "훅": "🔥", "설정": "📍", "고난": "⛈️", "전개": "📈",
+                        "전환": "🌅", "결말": "🏔️", "여운": "✨"
+                    }.get(scene.get('scene_role', ''), "🎬")
+
+                    with st.expander(
+                        f"장면 #{scene.get('scene_number', '?')} {role_emoji} {scene.get('scene_role', '')} — {scene.get('mood', '')} ({scene.get('duration_sec', '?')}초)",
+                        expanded=True
+                    ):
+                        st.markdown(f"**나레이션:** {scene.get('narration_ko', '')}")
+                        if scene.get('narration_en'):
+                            st.caption(f"EN: {scene['narration_en']}")
+
+            with scene_tab2:
+                st.caption("아래 프롬프트를 Midjourney 또는 DALL-E에 그대로 복사하세요.")
+                for scene in scenes:
+                    st.markdown(f"**장면 #{scene.get('scene_number', '?')} ({scene.get('scene_role', '')})**")
+                    st.code(scene.get('image_prompt', ''), language="text")
+
+                # 전체 이미지 프롬프트 다운로드
+                all_prompts = "\n\n".join([
+                    f"=== Scene #{s.get('scene_number', '?')} ({s.get('scene_role', '')}) ===\n{s.get('image_prompt', '')}"
+                    for s in scenes
+                ])
+                st.download_button(
+                    "💾 이미지 프롬프트 전체 다운로드",
+                    all_prompts,
+                    f"shorts_image_prompts.txt",
+                    mime="text/plain",
+                    use_container_width=True,
+                    key="dl_img_prompts"
+                )
+
+            with scene_tab3:
+                st.caption("TTS 엔진에 바로 입력 가능한 스크립트입니다.")
+                tts_full = ""
+                for scene in scenes:
+                    tts_line = scene.get('tts_script', scene.get('narration_ko', ''))
+                    st.markdown(f"**#{scene.get('scene_number', '?')}** {tts_line}")
+                    tts_full += tts_line + "\n"
+
+                st.download_button(
+                    "💾 TTS 스크립트 다운로드",
+                    tts_full,
+                    "shorts_tts_script.txt",
+                    mime="text/plain",
+                    use_container_width=True,
+                    key="dl_tts"
+                )
+
+            with scene_tab4:
+                # 언어별 자막 표로 정리
+                if scenes:
+                    subtitle_data = []
+                    for scene in scenes:
+                        row = {"#": scene.get('scene_number', '?'), "역할": scene.get('scene_role', '')}
+                        if scene.get('narration_ko'):
+                            row["한국어"] = scene['narration_ko']
+                        if scene.get('narration_en'):
+                            row["English"] = scene['narration_en']
+                        if scene.get('narration_jp'):
+                            row["日本語"] = scene['narration_jp']
+                        if scene.get('narration_zh'):
+                            row["中文"] = scene['narration_zh']
+                        subtitle_data.append(row)
+
+                    st.dataframe(subtitle_data, use_container_width=True)
+
+                    # 언어별 자막 다운로드
+                    for lang_key, lang_name, field in [
+                        ("ko", "한국어", "narration_ko"),
+                        ("en", "English", "narration_en"),
+                        ("jp", "日本語", "narration_jp"),
+                        ("zh", "中文", "narration_zh"),
+                    ]:
+                        texts = [s.get(field, '') for s in scenes if s.get(field)]
+                        if texts:
+                            srt_content = ""
+                            time_cursor = 0
+                            for idx, (scene, text) in enumerate([(s, s.get(field, '')) for s in scenes if s.get(field)]):
+                                dur = scene.get('duration_sec', 7)
+                                start_h, start_m = divmod(time_cursor, 3600)
+                                start_m, start_s = divmod(start_m if start_h == 0 else time_cursor % 3600, 60)
+                                end_time = time_cursor + dur
+                                end_h, end_rem = divmod(end_time, 3600)
+                                end_m, end_s = divmod(end_rem, 60)
+
+                                srt_content += f"{idx + 1}\n"
+                                srt_content += f"{int(start_h):02d}:{int(start_m):02d}:{int(start_s):02d},000 --> {int(end_h):02d}:{int(end_m):02d}:{int(end_s):02d},000\n"
+                                srt_content += f"{text}\n\n"
+                                time_cursor = end_time
+
+                            st.download_button(
+                                f"💾 {lang_name} 자막 (.srt)",
+                                srt_content,
+                                f"shorts_subtitle_{lang_key}.srt",
+                                mime="text/plain",
+                                use_container_width=True,
+                                key=f"dl_srt_{lang_key}"
+                            )
+
+            # 전체 JSON 다운로드
+            st.markdown("---")
+            st.download_button(
+                "💾 전체 데이터 JSON 다운로드",
+                json.dumps(data, ensure_ascii=False, indent=2),
+                "shorts_full_data.json",
+                mime="application/json",
+                use_container_width=True,
+                key="dl_shorts_json"
             )
 
 # ───────────────────────────────────────
 # 푸터
 # ───────────────────────────────────────
 st.markdown("---")
-st.caption("✍️ AutoPost v10.1 | BLUE JEANS PICTURES · CINEPARK | Powered by Claude AI + Web Search")
+st.caption("✍️ AutoPost v11.0 | BLUE JEANS PICTURES · CINEPARK | Powered by Claude AI + Web Search")
