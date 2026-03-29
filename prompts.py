@@ -471,20 +471,20 @@ SHORTS_TONES = {
 
 SHORTS_IMAGE_STYLES = {
     "수채화/지브리풍": {
-        "prompt_keywords": "watercolor illustration style, soft warm tones, Studio Ghibli inspired, gentle brush strokes, atmospheric lighting, muted colors with warm accents, delicate details, nostalgic mood",
-        "negative": "photorealistic, 3D render, anime, cartoon, harsh lighting, neon colors"
+        "prompt_keywords": "watercolor illustration style, soft warm tones, Studio Ghibli inspired, gentle brush strokes, atmospheric lighting, muted colors with warm accents, delicate details, nostalgic mood, no text, no letters, no writing",
+        "negative": "photorealistic, 3D render, anime, cartoon, harsh lighting, neon colors, text, letters, words, writing, signs, watermark"
     },
     "세상의모든지식 스타일": {
-        "prompt_keywords": "warm digital illustration, soft lighting, cozy atmosphere, gentle color palette, children's book illustration style, rounded shapes, warm orange and brown tones",
-        "negative": "photorealistic, 3D render, harsh shadows, neon colors, dark theme"
+        "prompt_keywords": "warm digital illustration, soft lighting, cozy atmosphere, gentle color palette, children's book illustration style, rounded shapes, warm orange and brown tones, no text, no letters, no writing",
+        "negative": "photorealistic, 3D render, harsh shadows, neon colors, dark theme, text, letters, words, writing, signs, watermark"
     },
     "플랫 일러스트": {
-        "prompt_keywords": "flat illustration style, clean lines, minimal design, bold colors, simple shapes, modern graphic design, vector art style",
-        "negative": "photorealistic, 3D render, watercolor, painterly, complex textures"
+        "prompt_keywords": "flat illustration style, clean lines, minimal design, bold colors, simple shapes, modern graphic design, vector art style, no text, no letters, no writing",
+        "negative": "photorealistic, 3D render, watercolor, painterly, complex textures, text, letters, words, writing, signs, watermark"
     },
     "웜톤 애니메이션": {
-        "prompt_keywords": "warm tone animation style, soft cel shading, gentle gradients, warm color palette, cozy illustration, character-focused, storybook quality",
-        "negative": "photorealistic, harsh shadows, neon, cyberpunk, dark theme"
+        "prompt_keywords": "warm tone animation style, soft cel shading, gentle gradients, warm color palette, cozy illustration, character-focused, storybook quality, no text, no letters, no writing",
+        "negative": "photorealistic, harsh shadows, neon, cyberpunk, dark theme, text, letters, words, writing, signs, watermark"
     },
 }
 
@@ -687,6 +687,7 @@ def get_shorts_script_prompt(topic, category, tone, image_style, num_scenes, lan
 {style_info['negative']}
 
 【공통 규칙】
+- 모든 프롬프트에 "no text, no letters, no words, no writing, no signs" 포함 (AI가 이미지에 의미 없는 글자를 생성하는 것을 방지)
 - 인물의 얼굴을 정면으로 묘사하지 않음 (뒷모습, 실루엣, 멀리서 본 모습)
 - 장면마다 조명/색감 변화로 감정 곡선을 표현
 - 고난 장면: 어두운 톤, 차가운 색감
