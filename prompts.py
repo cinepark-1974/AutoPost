@@ -424,3 +424,200 @@ Tags: #KoreanCinema #KContent #[relevant tags] (8-12 tags)
 【WORD COUNT】 800-1,500 words
 
 Now search the web for the latest facts, then write the English article."""
+
+
+# ═══════════════════════════════════════════════════════════════
+# 🎬 숏츠 대본 프롬프트 (YouTube Shorts Script)
+# ═══════════════════════════════════════════════════════════════
+
+SHORTS_CATEGORIES = {
+    "역사 속 무명의 사람들": {
+        "emoji": "🏛️",
+        "desc": "이름 없이 사라진 사람들의 성장서사",
+        "examples": ["등대지기", "우편배달부", "다리 건설 노동자", "전쟁고아의 선생님", "광부", "등짐장수", "해녀"],
+        "guide": "특정 실존 인물이 아닌 '유형'으로 서사를 구성. 시대와 장소를 구체적으로 설정하되, 이름은 부여하지 않음. 저작권·초상권 완전 프리."
+    },
+    "직업/기술 성장서사": {
+        "emoji": "🔨",
+        "desc": "무명의 장인·기술자 성장기",
+        "examples": ["바리스타", "용접공", "피아니스트", "목수", "요리사", "도예가", "재봉사"],
+        "guide": "익명의 인물이 기술을 연마하는 과정. 실패와 반복, 그리고 숙련의 순간을 감각적으로 묘사."
+    },
+    "동물/자연 서사": {
+        "emoji": "🐾",
+        "desc": "동물·자연의 성장과 생존 이야기",
+        "examples": ["버려진 강아지", "씨앗에서 거목까지", "철새의 여행", "산호초의 회복", "길고양이 가족"],
+        "guide": "의인화를 최소화하고, 자연의 경이로움 자체에 서사를 입힘. 감정 이입이 자연스럽게 이루어지도록."
+    },
+    "개념/발명품의 성장": {
+        "emoji": "💡",
+        "desc": "사물·개념의 탄생과 성장 서사",
+        "examples": ["라면의 세계정복", "연필 한 자루의 여정", "커피 한 잔의 역사", "우표의 모험", "종이의 탄생"],
+        "guide": "사물을 의인화하여 서사 구조를 입힘. '탄생 → 고난 → 전파 → 정착'의 여정으로 구성."
+    },
+    "가상 인물 시리즈": {
+        "emoji": "✨",
+        "desc": "완전 창작 캐릭터의 성장 시리즈물",
+        "examples": ["시골 소녀 셰프 되기", "실패한 화가의 재기", "노인의 마지막 여행", "소년과 별"],
+        "guide": "시리즈화를 염두에 둔 캐릭터 설정. 에피소드별 성장 아크가 연결되도록."
+    },
+}
+
+SHORTS_TONES = {
+    "따뜻한 감성": "부드럽고 따뜻한 톤. 여운이 남는 문장. '~했습니다', '~였습니다' 체. 짧은 호흡, 시적 리듬.",
+    "담담한 다큐": "감정을 절제한 다큐멘터리 톤. 팩트 중심, 건조하지만 울림 있는 서술. '~이다', '~했다' 체.",
+    "동화적 서술": "옛날이야기를 들려주는 듯한 톤. '옛날 옛적에' 느낌. 아이와 어른 모두 공감할 수 있는 보편적 언어.",
+}
+
+SHORTS_IMAGE_STYLES = {
+    "수채화/지브리풍": {
+        "prompt_keywords": "watercolor illustration style, soft warm tones, Studio Ghibli inspired, gentle brush strokes, atmospheric lighting, muted colors with warm accents, delicate details, nostalgic mood",
+        "negative": "photorealistic, 3D render, anime, cartoon, harsh lighting, neon colors"
+    },
+    "세상의모든지식 스타일": {
+        "prompt_keywords": "warm digital illustration, soft lighting, cozy atmosphere, gentle color palette, children's book illustration style, rounded shapes, warm orange and brown tones",
+        "negative": "photorealistic, 3D render, harsh shadows, neon colors, dark theme"
+    },
+    "플랫 일러스트": {
+        "prompt_keywords": "flat illustration style, clean lines, minimal design, bold colors, simple shapes, modern graphic design, vector art style",
+        "negative": "photorealistic, 3D render, watercolor, painterly, complex textures"
+    },
+    "웜톤 애니메이션": {
+        "prompt_keywords": "warm tone animation style, soft cel shading, gentle gradients, warm color palette, cozy illustration, character-focused, storybook quality",
+        "negative": "photorealistic, harsh shadows, neon, cyberpunk, dark theme"
+    },
+}
+
+
+def get_shorts_script_prompt(topic, category, tone, image_style, num_scenes, language_options):
+    """숏츠 대본 + 이미지 프롬프트 + TTS 스크립트 통합 생성 프롬프트"""
+
+    cat_info = SHORTS_CATEGORIES.get(category, SHORTS_CATEGORIES["역사 속 무명의 사람들"])
+    tone_guide = SHORTS_TONES.get(tone, SHORTS_TONES["따뜻한 감성"])
+    style_info = SHORTS_IMAGE_STYLES.get(image_style, SHORTS_IMAGE_STYLES["수채화/지브리풍"])
+
+    # 다국어 자막 지침
+    lang_instruction = ""
+    if "한국어" in language_options:
+        lang_instruction += "- 한국어 (KO): 원본 나레이션\n"
+    if "영어" in language_options:
+        lang_instruction += "- English (EN): Natural, poetic translation (not literal)\n"
+    if "일본어" in language_options:
+        lang_instruction += "- 日本語 (JP): 自然で詩的な翻訳\n"
+    if "중국어" in language_options:
+        lang_instruction += "- 中文 (ZH): 自然流畅的翻译\n"
+
+    return f"""당신은 유튜브 숏츠 성장서사 전문 스크립트 작가입니다.
+
+═══════════════════════════════════════
+🎬 기본 정보
+═══════════════════════════════════════
+
+【주제】 {topic}
+【카테고리】 {cat_info['emoji']} {category}
+【카테고리 가이드】 {cat_info['guide']}
+【나레이션 톤】 {tone_guide}
+【이미지 스타일】 {image_style}
+【장면 수】 {num_scenes}장
+
+═══════════════════════════════════════
+📐 숏츠 대본 구조 규칙
+═══════════════════════════════════════
+
+【필수 구조: 훅 → 설정 → 고난 → 전환 → 결말 → 여운】
+
+장면 1 (훅): 결말의 감정을 먼저 던진다. "그는 이름도 남기지 못했습니다" 같은 문장.
+  → 시청자가 3초 안에 멈추게 만드는 문장. 의문 또는 감정 유발.
+장면 2 (설정): 시대, 장소, 인물의 상황을 1~2문장으로 압축.
+장면 3~{num_scenes - 3} (고난/전개): 고난과 노력의 반복. 구체적 디테일(숫자, 감각, 행동).
+장면 {num_scenes - 2} (전환): 고난이 의미로 바뀌는 순간. 서사의 전환점.
+장면 {num_scenes - 1} (결말): 시간의 흐름 또는 결과. 성장의 완성.
+장면 {num_scenes} (여운): 짧고 강렬한 마무리 한 문장. 여백을 남김.
+
+【나레이션 규칙】
+- 한 장면당 1~2문장 (최대 40자 이내/문장)
+- 전체 숏츠 길이: 50~60초 (TTS 기준)
+- 설명하지 말고 보여줘라 (Show, don't tell)
+- 감정을 직접 명시하지 않음 ("슬펐다" ❌ → "편지를 접어 서랍에 넣었다" ✅)
+- 마지막 장면은 반드시 여운을 남기는 한 문장
+
+【저작권·초상권 규칙】
+- 실존 인물의 이름, 얼굴 묘사 금지
+- 특정 브랜드, 로고, 상표 언급 금지
+- 시대와 장소는 구체적으로, 인물은 익명으로
+
+═══════════════════════════════════════
+🎨 이미지 프롬프트 규칙
+═══════════════════════════════════════
+
+각 장면마다 Midjourney/DALL-E용 영문 프롬프트를 생성하세요.
+
+【공통 스타일 키워드 (매 장면 필수 포함)】
+{style_info['prompt_keywords']}
+
+【공통 네거티브 (매 장면 필수 포함)】
+{style_info['negative']}
+
+【프롬프트 형식】
+[장면 묘사, 구체적 행동/상황, 시대/장소 힌트], {style_info['prompt_keywords']} --ar 9:16 --v 6
+
+【규칙】
+- 인물의 얼굴을 정면으로 묘사하지 않음 (뒷모습, 실루엣, 멀리서 본 모습)
+- 장면마다 조명/색감 변화로 감정 곡선을 표현
+- 고난 장면: 어두운 톤, 차가운 색감
+- 전환/결말: 따뜻한 톤, 골든아워 조명
+
+═══════════════════════════════════════
+🗣️ TTS 스크립트 규칙
+═══════════════════════════════════════
+
+나레이션 텍스트를 TTS 엔진에 최적화된 형태로 별도 출력하세요.
+
+【TTS 최적화 규칙】
+- 쉼표(,)와 마침표(.) 위치가 자연스러운 호흡 단위
+- 숫자는 한글로 풀어쓰기 (320 → 삼백이십)
+- 한자어보다 순우리말 우선
+- 각 장면 사이에 [2초 pause] 표시
+
+═══════════════════════════════════════
+🌐 다국어 자막
+═══════════════════════════════════════
+
+각 장면의 나레이션을 아래 언어로 자막을 생성하세요:
+{lang_instruction}
+
+【자막 규칙】
+- 직역이 아닌 의역 (해당 언어에서 자연스러운 표현)
+- 한 줄 자막은 15자(한국어 기준) / 40자(영어 기준) 이내
+- 감정의 뉘앙스를 살린 번역
+
+═══════════════════════════════════════
+📋 출력 형식 (반드시 이 JSON 형식으로)
+═══════════════════════════════════════
+
+반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트나 마크다운은 포함하지 마세요.
+
+{{
+  "title": "숏츠 제목 (한국어)",
+  "title_en": "Shorts Title (English)",
+  "description": "숏츠 설명 (2줄 이내)",
+  "hashtags": ["#태그1", "#태그2", "#태그3", ...최대 15개],
+  "total_duration_sec": 55,
+  "scenes": [
+    {{
+      "scene_number": 1,
+      "scene_role": "훅",
+      "narration_ko": "한국어 나레이션",
+      "narration_en": "English narration",
+      "narration_jp": "日本語ナレーション",
+      "narration_zh": "中文旁白",
+      "tts_script": "TTS 최적화된 한국어 텍스트 [2초 pause]",
+      "image_prompt": "Midjourney prompt in English --ar 9:16 --v 6",
+      "duration_sec": 7,
+      "mood": "mysterious / warm / melancholic / hopeful 등"
+    }}
+  ]
+}}
+
+다국어 자막 필드는 요청된 언어만 포함하세요.
+이제 숏츠 대본을 생성하세요."""
