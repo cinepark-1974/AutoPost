@@ -8,11 +8,11 @@ def get_stock_data(ticker_str="DIS"):
         ticker = yf.Ticker(ticker_str)
         hist = ticker.history(period="7d")
         if hist.empty:
-            return None
+            print(f"${ticker_str}: possibly delisted; No price data found  (period=7d)")
+            raise ValueError("empty history")
         close = hist['Close'].iloc[-1]
         prev = hist['Close'].iloc[-2] if len(hist) > 1 else close
         change = (close - prev) / prev * 100 if prev != 0 else 0
-        # 그래프 저장
         plt.figure(figsize=(4, 1.2))
         plt.plot(hist['Close'], linewidth=2.5)
         plt.axis('off')
@@ -29,7 +29,8 @@ def get_stock_data(ticker_str="DIS"):
             "date": datetime.now().strftime("%Y-%m-%d")
         }
     except Exception as e:
-        print(f"stock error {ticker_str}: {e}")
+        print(f"Failed to get ticker '{ticker_str}' reason: {e}")
+        # 실패해도 None 반환하지 않고 더미 데이터 반환 -> main.py가 죽지 않음
         return {
             "ticker": ticker_str,
             "close": 0,
