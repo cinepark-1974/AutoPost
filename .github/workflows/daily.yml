@@ -1,10 +1,8 @@
 name: Daily Hollywood CardNews
-
 on:
   schedule:
-    - cron: '0 23 * * *'  # KST 08:00 = UTC 23:00
+    - cron: '0 23 * * *'
   workflow_dispatch:
-
 jobs:
   generate:
     runs-on: ubuntu-latest
@@ -19,11 +17,11 @@ jobs:
       - name: Run generator
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GDRIVE_FOLDER_ID_Background: ${{ secrets.GDRIVE_FOLDER_ID_Background }}
-          GDRIVE_FOLDER_ID_Output: ${{ secrets.GDRIVE_FOLDER_ID_Output }}
+          CLAUDE_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GDRIVE_FOLDER_ID_BACKGROUND: ${{ secrets.GDRIVE_FOLDER_ID_BACKGROUND }}
+          GDRIVE_FOLDER_ID_Background: ${{ secrets.GDRIVE_FOLDER_ID_BACKGROUND }}
+          GDRIVE_FOLDER_ID_OUTPUT: ${{ secrets.GDRIVE_FOLDER_ID_OUTPUT }}
+          GDRIVE_FOLDER_ID_Output: ${{ secrets.GDRIVE_FOLDER_ID_OUTPUT }}
           GOOGLE_CREDENTIALS_JSON_CONTENT: ${{ secrets.GOOGLE_CREDENTIALS_JSON_CONTENT }}
-          GOOGLE_CREDENTIALS_JSON: ./credentials.json
         run: |
           python main.py
