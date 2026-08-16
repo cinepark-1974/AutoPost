@@ -1,161 +1,89 @@
-name: Daily Hollywood CardNews
+name: Daily Poster
 on:
-  schedule:
-    - cron: '0 23 * * *'
   workflow_dispatch:
+  schedule:
+    - cron: '0 21 * * *'
 jobs:
   generate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install dependencies
-        run: pip install -r requirements.txt google-api-python-client google-auth yfinance anthropic openai
-      - name: Patch all files (final)
-        run: |
-          cat > utils/drive_uploader.py << 'PY'
-          import os, json, random, io
-          from pathlib import Path
-          def get_drive_service():
-              from google.oauth2 import service_account
-              from googleapiclient.discovery import build
-              scopes=["https://www.googleapis.com/auth/drive"]
-              jc=os.getenv("GOOGLE_CREDENTIALS_JSON_CONTENT")
-              if jc:
-                  try:
-                      info=json.loads(jc)
-                      creds=service_account.Credentials.from_service_account_info(info, scopes=scopes)
-                      print("Drive 인증: JSON_CONTENT 사용")
-                      return build("drive","v3",credentials=creds)
-                  except Exception as e:
-                      print(f"JSON 파싱 실패: {e}")
-              cp=os.getenv("GOOGLE_CREDENTIALS_JSON","./credentials.json")
-              if Path(cp).exists():
-                  from google.oauth2 import service_account
-                  from googleapiclient.discovery import build
-                  creds=service_account.Credentials.from_service_account_file(cp, scopes=scopes)
-                  return build("drive","v3",credentials=creds)
-              print("credentials 없음")
-              return None
-          def get_background_id():
-              return os.getenv('GDRIVE_FOLDER_ID_BACKGROUND') or os.getenv('GDRIVE_FOLDER_ID_BACKGROUND_IMAGES') or os.getenv('GDRIVE_FOLDER_ID_Background') or ''
-          def download_random_background(fid):
-              if not fid:
-                  fid=get_background_id()
-              if not fid: return None
-              try:
-                  s=get_drive_service()
-                  if not s: return None
-                  q=f"'{fid}' in parents and trashed=false and mimeType contains 'image/'"
-                  res=s.files().list(q=q, fields="files(id, name)", pageSize=100, supportsAllDrives=True, includeItemsFromAllDrives=True).execute()
-                  files=res.get('files',[])
-                  if not files:
-                      print("Background 폴더 비어있음")
-                      return None
-                  ch=random.choice(files)
-                  print(f"Background 선택: {ch['name']}")
-                  from googleapiclient.http import MediaIoBaseDownload
-                  req=s.files().get_media(fileId=ch['id'])
-                  fh=io.BytesIO()
-                  dl=MediaIoBaseDownload(fh, req)
-                  done=False
-                  while not done:
-                      _,done=dl.next_chunk()
-                  tmp=f"/tmp/bg_{ch['name']}"
-                  open(tmp,'wb').write(fh.getvalue())
-                  return tmp
-              except Exception as e:
-                  print(f"BG 실패: {e}")
-                  return None
-          def upload_to_drive(local_folder, drive_folder_id=None):
-              user_email=os.getenv('USER_EMAIL') or os.getenv('GDRIVE_USER_EMAIL') or ''
-              if not drive_folder_id:
-                  print("OUTPUT ID 없음 → 드라이브 스킵")
-                  return
-              try:
-                  service=get_drive_service()
-                  if not service: return
-                  from googleapiclient.http import MediaFileUpload
-                  folder_name=Path(local_folder).name
-                  meta={"name":folder_name,"mimeType":"application/vnd.google-apps.folder","parents":[drive_folder_id]}
-                  folder=service.files().create(body=meta, fields="id", supportsAllDrives=True).execute()
-                  nid=folder.get("id")
-                  print(f"Drive 폴더 생성: {folder_name} ({nid})")
-                  # 폴더 소유권 이전 시도
-                  if user_email:
-                      try:
-                          service.permissions().create(fileId=nid, body={"type":"user","role":"owner","emailAddress":user_email}, transferOwnership=True, supportsAllDrives=True).execute()
-                          print(f"  폴더 소유권 이전: {user_email}")
-                      except Exception as e:
-                          print(f"  폴더 소유권 이전 실패(무시): {e}")
-                  for f in Path(local_folder).glob("*"):
-                      if not f.is_file(): continue
-                      try:
-                          media=MediaFileUpload(str(f), resumable=True)
-                          created=service.files().create(body={"name":f.name,"parents":[nid]}, media_body=media, fields="id", supportsAllDrives=True).execute()
-                          fid=created.get("id")
-                          print(f"  업로드: {f.name} ({fid})")
-                          if user_email:
-                              try:
-                                  service.permissions().create(fileId=fid, body={"type":"user","role":"owner","emailAddress":user_email}, transferOwnership=True, supportsAllDrives=True).execute()
-                              except Exception as oe:
-                                  print(f"    소유권 이전 실패: {oe}")
-                      except Exception as e:
-                          msg=str(e)
-                          if "storage quota" in msg.lower() or "storageQuotaExceeded" in msg or "quota" in msg.lower():
-                              print(f"  ! quota 에러: {msg[:200]}")
-                          else:
-                              print(f"  업로드 실패 {f.name}: {e}")
-                  print(f"Drive 처리 완료")
-              except Exception as e:
-                  print(f"Drive 실패(무시): {e}")
-                  # 절대 raise 안 함
-          PY
-          cat > utils/stock.py << 'PY'
-          def _fetch(ticker):
-              try:
-                  import yfinance as yf
-                  t=yf.Ticker(ticker)
-                  hist=t.history(period="7d")
-                  if hist.empty:
-                      raise ValueError("empty")
-                  close=float(hist['Close'].iloc[-1])
-                  prev=float(hist['Close'].iloc[-2]) if len(hist)>1 else close
-                  change=((close-prev)/prev*100) if prev else 0
-                  return {"ticker":ticker,"close":round(close,2),"change":round(change,2),"history":[],"chart_path":None}
-              except Exception as e:
-                  print(f"주식 {ticker} 실패 → 더미: {e}")
-                  return {"ticker":ticker,"close":0,"change":0,"history":[],"chart_path":None,"date":""}
-
-          def get_stock_data(ticker):
-              return _fetch(ticker)
-
-          def get_stock_info(ticker):
-              return _fetch(ticker)
-
-          # 호환성
-          get_stock_data = get_stock_data
-          get_stock_info = get_stock_info
-          PY
-      - name: Run generator
+      - name: Install
+        run: pip install anthropic pillow requests
+      - name: Generate Cards
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          CLAUDE_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GDRIVE_FOLDER_ID_BACKGROUND: ${{ secrets.GDRIVE_FOLDER_ID_BACKGROUND || secrets.GDRIVE_FOLDER_ID_BACKGROUND_IMAGES || secrets.GDRIVE_FOLDER_ID_Background }}
-          GDRIVE_FOLDER_ID_OUTPUT: ${{ secrets.GDRIVE_FOLDER_ID_OUTPUT }}
-          GOOGLE_CREDENTIALS_JSON_CONTENT: ${{ secrets.GOOGLE_CREDENTIALS_JSON_CONTENT }}
         run: |
-          python main.py
-          echo "=== output folder list ==="
-          ls -R output || echo "output 없음"
-      - name: Upload cards artifact
-        if: always()
+          import os, json, random
+          from pathlib import Path
+          from PIL import Image, ImageDraw, ImageFont
+          import anthropic
+
+          client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+
+          # 배경 이미지 없이 그라데이션 배경 생성
+          def create_card(text, idx, date_str):
+              W, H = 1080, 1350
+              img = Image.new('RGB', (W, H), (20,20,30))
+              draw = ImageDraw.Draw(img)
+              # 그라데이션
+              for y in range(H):
+                  r = int(20 + y*0.1)
+                  g = int(20 + y*0.05)
+                  b = int(30 + y*0.1)
+                  draw.line([(0,y),(W,y)], fill=(r%255,g%255,b%255))
+              # 텍스트 박스
+              try:
+                  font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 60)
+                  small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 35)
+              except:
+                  font = ImageFont.load_default()
+                  small = font
+              # 텍스트 줄바꿈
+              words = text.split()
+              lines = []
+              cur = ""
+              for w in words:
+                  if len(cur + " " + w) < 20:
+                      cur = cur + " " + w if cur else w
+                  else:
+                      lines.append(cur)
+                      cur = w
+              if cur: lines.append(cur)
+
+              y = 300
+              for line in lines:
+                  bbox = draw.textbbox((0,0), line, font=font)
+                  tw = bbox[2]-bbox[0]
+                  draw.text(((W-tw)//2, y), line, font=font, fill=(255,255,255))
+                  y += 80
+              draw.text((50, H-100), f"{date_str} #{idx}", font=small, fill=(200,200,200))
+              Path("output").mkdir(exist_ok=True)
+              img.save(f"output/card_{idx}.png")
+              print(f"Card {idx} created")
+
+          # Claude로 문구 생성
+          prompt = """영화 명대사 카드 5개 만들어줘. JSON 배열로만 답해.
+          형식: [{"text":"명대사 한글 2줄 이내"}]
+          """
+          msg = client.messages.create(model="claude-3-5-sonnet-20241022", max_tokens=1000, messages=[{"role":"user","content":prompt}])
+          txt = msg.content[0].text
+          # JSON 추출
+          import re
+          m = re.search(r'\[.*\]', txt, re.DOTALL)
+          cards = json.loads(m.group(0)) if m else [{"text":"영화를 사랑하세요"}]*5
+
+          from datetime import datetime
+          date_str = datetime.now().strftime("%Y-%m-%d")
+          for i, c in enumerate(cards[:5], 1):
+              create_card(c.get('text','영화 명대사'), i, date_str)
+          print(f"Generated {len(cards)} cards")
+
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: hollywood-cards
+          name: generated-cards
           path: output/
-          if-no-files-found: warn
