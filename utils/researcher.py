@@ -68,4 +68,17 @@ def research_cardnews(api_key):
     # 날짜 보정
     if not data.get("date"):
         data["date"] = today
+
+    # 주가 값 확보 상태 로그 (왜 빠졌는지 바로 알 수 있게)
+    tk = data.get("ticker", "N/A")
+    checks = {
+        "종가": data.get("close"),
+        "전일대비": data.get("change"),
+        "52주최고": data.get("week52_high"),
+        "52주최저": data.get("week52_low"),
+    }
+    got = [k for k, v in checks.items() if v is not None]
+    missing = [k for k, v in checks.items() if v is None]
+    print(f"주가 {tk}: 확보 {got if got else '없음'}" + (f" / 누락 {missing}" if missing else ""))
+
     return data

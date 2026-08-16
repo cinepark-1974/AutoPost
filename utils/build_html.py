@@ -47,8 +47,15 @@ body {{
 .mkt-change.up {{ color:{GREEN}; }}
 .mkt-change.down {{ color:{RED}; }}
 .mkt-noprice {{ color:{SUB}; font-weight:900; font-size:60px; margin-top:24px; }}
-.chart-wrap {{ margin-top:80px; }}
-.note {{ color:{SUB}; font-weight:700; font-size:30px; line-height:1.5; margin-top:60px; }}
+.range-label {{ color:{SUB}; font-weight:700; font-size:34px; letter-spacing:2px; margin-top:96px; }}
+.range-wrap {{ position:relative; width:920px; height:130px; margin-top:28px; }}
+.range-track {{ position:absolute; top:58px; left:0; width:920px; height:14px; background:rgba(157,176,200,0.15); border-radius:7px; }}
+.range-fill {{ position:absolute; top:58px; left:0; height:14px; background:{BLUE}; border-radius:7px; }}
+.range-dot {{ position:absolute; top:43px; width:44px; height:44px; background:{GOLD}; border:7px solid {BG}; border-radius:50%; }}
+.range-pct {{ position:absolute; top:100px; width:140px; text-align:center; color:{GOLD}; font-weight:900; font-size:32px; }}
+.range-lo {{ position:absolute; top:0; left:0; color:{SUB}; font-weight:700; font-size:36px; }}
+.range-hi {{ position:absolute; top:0; right:0; color:{SUB}; font-weight:700; font-size:36px; }}
+.note {{ color:{SUB}; font-weight:700; font-size:30px; line-height:1.5; margin-top:80px; }}
 .source {{ color:{SUB}; font-weight:700; font-size:28px; margin-top:32px; opacity:0.7; }}
 """
 
@@ -58,7 +65,6 @@ def _frame():
 
 
 def _esc(s):
-    """헤드라인/서브의 <br>,<span>은 허용하되 나머지는 그대로. Claude가 이미 안전 태그만 넣음."""
     return s if s else ""
 
 
@@ -95,8 +101,7 @@ def card_industry(d):
 def card_numbers(d):
     stats_data = d.get("stats", []) or []
     if not stats_data:
-        # 스탯이 없으면 이 카드는 산업 뉴스 보조 텍스트로 대체하지 않고 최소 안내
-        inner = '<div class="why-body">기사에 명시된 수치가 없어 이 카드는 생략되었습니다.</div>'
+        inner = '<div class="why-body">기사에 명시된 수치가 없습니다.</div>'
     else:
         inner = ""
         for i, s in enumerate(stats_data[:3]):
@@ -119,53 +124,55 @@ def card_why(d):
 </div>"""
 
 
-def _sparkline(history, w=920, h=340):
-    if not history or len(history) < 2:
+def _range_bar(low, high, cur, w=920):
+    """52주 최저~최고 레인지 바. 현재가 위치를 골드 점으로 표시."""
+    try:
+        low = float(low); high = float(high); cur = float(cur)
+    except (ValueError, TypeError):
         return ""
-    lo, hi = min(history), max(history)
-    rng = (hi - lo) or 1
-    n = len(history)
-    pts = []
-    for i, v in enumerate(history):
-        x = i / (n - 1) * w
-        y = h - (v - lo) / rng * (h - 40) - 20
-        pts.append(f"{x:.1f},{y:.1f}")
-    poly = " ".join(pts)
-    last_x, last_y = pts[-1].split(",")
-    up = history[-1] >= history[0]
-    col = GREEN if up else RED
-    return f"""<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}">
-  <polyline points="{poly}" fill="none" stroke="{BLUE}" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
-  <circle cx="{last_x}" cy="{last_y}" r="12" fill="{col}"/>
-</svg>"""
+    rng = (high - low) or 1
+    pos = max(0.0, min(1.0, (cur - low) / rng))
+    cx = pos * w
+    pct = int(round(pos * 100))
+    return f"""<div class="range-label">52주 범위</div>
+  <div class="range-wrap">
+    <div class="range-track"></div>
+    <div class="range-fill" style="width:{cx:.0f}px"></div>
+    <div class="range-dot" style="left:{cx-22:.0f}px"></div>
+    <div class="range-pct" style="left:{cx-70:.0f}px">{pct}%</div>
+    <div class="range-lo">${low:.2f}</div>
+    <div class="range-hi">${high:.2f}</div>
+  </div>"""
 
 
 def card_market(d):
     close = d.get("close")
     change = d.get("change")
-    history = d.get("history", []) or []
+    hi = d.get("week52_high")
+    lo = d.get("week52_low")
 
     if close is not None:
         price_html = f'<div class="mkt-price">${float(close):.2f}</div>'
     else:
-        price_html = '<div class="mkt-noprice">라이브 차트 확인 필요</div>'
+        price_html = '<div class="mkt-noprice">종가 확인 필요</div>'
 
     change_html = ""
     if change is not None:
         up = float(change) >= 0
         cls = "up" if up else "down"
         arrow = "\u25b2" if up else "\u25bc"
-        change_html = f'<div class="mkt-change {cls}">{arrow} {abs(float(change)):.1f}%</div>'
+        change_html = f'<div class="mkt-change {cls}">{arrow} {abs(float(change)):.2f}%</div>'
 
-    chart = _sparkline(history)
-    chart_html = f'<div class="chart-wrap">{chart}</div>' if chart else ""
+    range_html = ""
+    if close is not None and hi is not None and lo is not None:
+        range_html = _range_bar(lo, hi, close)
 
     return f"""<div class="card">{_frame()}
   <div class="section-title">04. MARKET CLOSE</div>
   <div class="mkt-company">{_esc(d.get('company',''))} · {_esc(d.get('ticker',''))}</div>
   {price_html}
   {change_html}
-  {chart_html}
+  {range_html}
   <div class="note">{_esc(d.get('map_note',''))}</div>
   <div class="source">{_esc(d.get('source',''))} · 종가 기준 {d.get('date','')}</div>
 </div>"""
