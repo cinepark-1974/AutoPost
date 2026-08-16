@@ -1,89 +1,37 @@
-name: Daily Poster
+name: Daily Hollywood CardNews
 on:
-  workflow_dispatch:
   schedule:
-    - cron: '0 21 * * *'
+    - cron: '0 23 * * *'
+  workflow_dispatch:
 jobs:
   generate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install
-        run: pip install anthropic pillow requests
-      - name: Generate Cards
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install google-api-python-client google-auth
+      - name: Run generator
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GDRIVE_FOLDER_ID_BACKGROUND: ${{ secrets.GDRIVE_FOLDER_ID_BACKGROUND }}
+          GDRIVE_FOLDER_ID_OUTPUT: ${{ secrets.GDRIVE_FOLDER_ID_OUTPUT }}
+          GOOGLE_CREDENTIALS_JSON_CONTENT: ${{ secrets.GOOGLE_CREDENTIALS_JSON_CONTENT }}
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+          GOOGLE_OAUTH_REFRESH_TOKEN: ${{ secrets.GOOGLE_OAUTH_REFRESH_TOKEN }}
+          USER_EMAIL: ${{ secrets.USER_EMAIL }}
         run: |
-          import os, json, random
-          from pathlib import Path
-          from PIL import Image, ImageDraw, ImageFont
-          import anthropic
-
-          client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
-
-          # 배경 이미지 없이 그라데이션 배경 생성
-          def create_card(text, idx, date_str):
-              W, H = 1080, 1350
-              img = Image.new('RGB', (W, H), (20,20,30))
-              draw = ImageDraw.Draw(img)
-              # 그라데이션
-              for y in range(H):
-                  r = int(20 + y*0.1)
-                  g = int(20 + y*0.05)
-                  b = int(30 + y*0.1)
-                  draw.line([(0,y),(W,y)], fill=(r%255,g%255,b%255))
-              # 텍스트 박스
-              try:
-                  font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 60)
-                  small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 35)
-              except:
-                  font = ImageFont.load_default()
-                  small = font
-              # 텍스트 줄바꿈
-              words = text.split()
-              lines = []
-              cur = ""
-              for w in words:
-                  if len(cur + " " + w) < 20:
-                      cur = cur + " " + w if cur else w
-                  else:
-                      lines.append(cur)
-                      cur = w
-              if cur: lines.append(cur)
-
-              y = 300
-              for line in lines:
-                  bbox = draw.textbbox((0,0), line, font=font)
-                  tw = bbox[2]-bbox[0]
-                  draw.text(((W-tw)//2, y), line, font=font, fill=(255,255,255))
-                  y += 80
-              draw.text((50, H-100), f"{date_str} #{idx}", font=small, fill=(200,200,200))
-              Path("output").mkdir(exist_ok=True)
-              img.save(f"output/card_{idx}.png")
-              print(f"Card {idx} created")
-
-          # Claude로 문구 생성
-          prompt = """영화 명대사 카드 5개 만들어줘. JSON 배열로만 답해.
-          형식: [{"text":"명대사 한글 2줄 이내"}]
-          """
-          msg = client.messages.create(model="claude-3-5-sonnet-20241022", max_tokens=1000, messages=[{"role":"user","content":prompt}])
-          txt = msg.content[0].text
-          # JSON 추출
-          import re
-          m = re.search(r'\[.*\]', txt, re.DOTALL)
-          cards = json.loads(m.group(0)) if m else [{"text":"영화를 사랑하세요"}]*5
-
-          from datetime import datetime
-          date_str = datetime.now().strftime("%Y-%m-%d")
-          for i, c in enumerate(cards[:5], 1):
-              create_card(c.get('text','영화 명대사'), i, date_str)
-          print(f"Generated {len(cards)} cards")
-
-      - name: Upload Artifact
+          python main.py
+      - name: Upload cards as artifact (always)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: generated-cards
-          path: output/
+          path: generated_cards/
+          if-no-files-found: warn
