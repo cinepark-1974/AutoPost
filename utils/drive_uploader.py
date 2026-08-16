@@ -58,46 +58,6 @@ def get_drive_service():
     return None
 
 
-def download_random_background(drive_folder_id):
-    if not drive_folder_id:
-        print("GDRIVE_FOLDER_ID_BACKGROUND 없음")
-        return None
-    try:
-        service = get_drive_service()
-        if not service:
-            return None
-        query = f"'{drive_folder_id}' in parents and trashed=false and mimeType contains 'image/'"
-        results = service.files().list(
-            q=query,
-            fields="files(id, name)",
-            pageSize=100,
-            supportsAllDrives=True,
-            includeItemsFromAllDrives=True,
-        ).execute()
-        files = results.get("files", [])
-        if not files:
-            print("Background 폴더에 이미지 없음")
-            return None
-        import random
-        chosen = random.choice(files)
-        print(f"Background 선택: {chosen['name']}")
-
-        from googleapiclient.http import MediaIoBaseDownload
-        import io
-        request = service.files().get_media(fileId=chosen["id"])
-        fh = io.BytesIO()
-        downloader = MediaIoBaseDownload(fh, request)
-        done = False
-        while not done:
-            status, done = downloader.next_chunk()
-        tmp_path = f"/tmp/bg_{chosen['name']}"
-        with open(tmp_path, "wb") as f:
-            f.write(fh.getvalue())
-        return tmp_path
-    except Exception as e:
-        print(f"Background 다운로드 실패 (무시): {e}")
-        return None
-
 
 def upload_to_drive(local_folder, drive_folder_id=None):
     if not drive_folder_id:
