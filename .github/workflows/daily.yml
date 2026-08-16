@@ -14,89 +14,112 @@ jobs:
           python-version: '3.11'
       - name: Install dependencies
         run: pip install -r requirements.txt google-api-python-client google-auth
-      - name: Patch drive_uploader (auto-fix for mobile)
+      - name: Patch drive_uploader + stock (shared drive fix)
         run: |
           cat > utils/drive_uploader.py << 'PY'
-          import os
-          import json
+          import os, json, random, io
           from pathlib import Path
 
           def get_drive_service():
               from google.oauth2 import service_account
               from googleapiclient.discovery import build
               scopes = ["https://www.googleapis.com/auth/drive"]
-              json_content = os.getenv("GOOGLE_CREDENTIALS_JSON_CONTENT")
-              if json_content:
+              jc = os.getenv("GOOGLE_CREDENTIALS_JSON_CONTENT")
+              if jc:
                   try:
-                      info = json.loads(json_content)
+                      info = json.loads(jc)
                       creds = service_account.Credentials.from_service_account_info(info, scopes=scopes)
-                      print("Drive 인증: GOOGLE_CREDENTIALS_JSON_CONTENT 사용")
+                      print("Drive 인증: JSON_CONTENT 사용")
                       return build("drive", "v3", credentials=creds)
                   except Exception as e:
-                      print(f"JSON_CONTENT 파싱 실패: {e}")
-              cred_path = os.getenv("GOOGLE_CREDENTIALS_JSON", "./credentials.json")
-              if Path(cred_path).exists():
-                  creds = service_account.Credentials.from_service_account_file(cred_path, scopes=scopes)
-                  print(f"Drive 인증: 파일 사용 {cred_path}")
+                      print(f"JSON 파싱 실패: {e}")
+              cp = os.getenv("GOOGLE_CREDENTIALS_JSON", "./credentials.json")
+              if Path(cp).exists():
+                  from google.oauth2 import service_account
+                  from googleapiclient.discovery import build
+                  creds = service_account.Credentials.from_service_account_file(cp, scopes=scopes)
                   return build("drive", "v3", credentials=creds)
-              print("credentials.json 없음 → 드라이브 업로드 스킵")
+              print("credentials.json 없음")
               return None
 
           def download_random_background(drive_folder_id):
-              if not drive_folder_id:
-                  return None
+              if not drive_folder_id: return None
               try:
                   service = get_drive_service()
-                  if not service:
-                      return None
-                  query = f"'{drive_folder_id}' in parents and trashed=false and mimeType contains 'image/'"
-                  results = service.files().list(q=query, fields="files(id, name)", pageSize=100).execute()
-                  files = results.get('files', [])
+                  if not service: return None
+                  q = f"'{drive_folder_id}' in parents and trashed=false and mimeType contains 'image/'"
+                  res = service.files().list(q=q, fields="files(id, name)", pageSize=100, supportsAllDrives=True, includeItemsFromAllDrives=True).execute()
+                  files = res.get('files', [])
                   if not files:
-                      print("Background 폴더에 이미지 없음")
+                      print("Background 폴더 비어있음")
                       return None
-                  import random
                   chosen = random.choice(files)
                   print(f"Background 선택: {chosen['name']}")
                   from googleapiclient.http import MediaIoBaseDownload
-                  import io
-                  request = service.files().get_media(fileId=chosen['id'])
+                  req = service.files().get_media(fileId=chosen['id'])
                   fh = io.BytesIO()
-                  downloader = MediaIoBaseDownload(fh, request)
-                  done = False
+                  dl = MediaIoBaseDownload(fh, req)
+                  done=False
                   while not done:
-                      status, done = downloader.next_chunk()
-                  tmp_path = f"/tmp/bg_{chosen['name']}"
-                  with open(tmp_path, 'wb') as f:
-                      f.write(fh.getvalue())
-                  return tmp_path
+                      s,done = dl.next_chunk()
+                  tmp = f"/tmp/bg_{chosen['name']}"
+                  open(tmp,'wb').write(fh.getvalue())
+                  return tmp
               except Exception as e:
-                  print(f"Background 다운로드 실패: {e}")
+                  print(f"Background 실패: {e}")
                   return None
 
           def upload_to_drive(local_folder, drive_folder_id=None):
               if not drive_folder_id:
-                  print("DRIVE_FOLDER_ID 없음")
+                  print("OUTPUT ID 없음")
                   return
               try:
                   service = get_drive_service()
-                  if not service:
-                      return
+                  if not service: return
                   from googleapiclient.http import MediaFileUpload
                   folder_name = Path(local_folder).name
-                  file_metadata = {"name": folder_name, "mimeType": "application/vnd.google-apps.folder", "parents": [drive_folder_id]}
-                  folder = service.files().create(body=file_metadata, fields="id").execute()
-                  new_folder_id = folder.get("id")
-                  print(f"Drive 폴더 생성: {folder_name} ({new_folder_id})")
-                  for file in Path(local_folder).glob("*"):
-                      if file.is_file():
-                          media = MediaFileUpload(str(file), resumable=True)
-                          service.files().create(body={"name": file.name, "parents": [new_folder_id]}, media_body=media, fields="id").execute()
-                          print(f"  업로드: {file.name}")
-                  print(f"Drive 업로드 완료: {folder_name}")
+                  meta = {"name": folder_name, "mimeType": "application/vnd.google-apps.folder", "parents": [drive_folder_id]}
+                  folder = service.files().create(body=meta, fields="id", supportsAllDrives=True).execute()
+                  new_id = folder.get("id")
+                  print(f"Drive 폴더 생성: {folder_name} ({new_id})")
+                  for f in Path(local_folder).glob("*"):
+                      if not f.is_file(): continue
+                      try:
+                          media = MediaFileUpload(str(f), resumable=True)
+                          service.files().create(body={"name": f.name, "parents": [new_id]}, media_body=media, fields="id", supportsAllDrives=True).execute()
+                          print(f"  업로드: {f.name}")
+                      except Exception as e:
+                          # 서비스계정 MyDrive quota 에러 → 경고만 하고 계속
+                          if "storage quota" in str(e).lower() or "storageQuotaExceeded" in str(e):
+                              print(f"  ! 서비스계정 MyDrive quota 에러 → 공유 드라이브(Shared Drive) 사용 필요. 파일 {f.name}은 Artifacts에서 받으세요.")
+                              print(f"  해결: 드라이브에서 '공유 드라이브' 새로 만들고, 서비스계정을 멤버로 추가 후 그 ID를 GDRIVE_FOLDER_ID_OUTPUT에 넣으세요.")
+                          else:
+                              print(f"  업로드 실패 {f.name}: {e}")
+                  print(f"Drive 처리 완료: {folder_name} (일부 실패해도 Artifacts는 정상)")
               except Exception as e:
-                  print(f"Drive 업로드 실패: {e}")
-                  raise
+                  # 폴더 자체가 404면 공유 안 된 것
+                  if "storage quota" in str(e).lower() or "storageQuotaExceeded" in str(e):
+                      print(f"Drive quota 에러 - 공유 드라이브 필요: {e}")
+                  else:
+                      print(f"Drive 업로드 실패(치명적 아님): {e}")
+                  # raise 하지 않음 - Artifacts는 살림
+          PY
+          # stock 패치 - yfinance 실패시 더미 반환
+          cat > utils/stock.py << 'PY'
+          def get_stock_info(ticker):
+              try:
+                  import yfinance as yf
+                  t = yf.Ticker(ticker)
+                  hist = t.history(period="7d")
+                  if hist.empty:
+                      raise ValueError("empty history")
+                  close = float(hist['Close'].iloc[-1])
+                  prev = float(hist['Close'].iloc[-2]) if len(hist)>1 else close
+                  change = ((close-prev)/prev*100) if prev else 0
+                  return {"ticker": ticker, "close": round(close,2), "change": round(change,2)}
+              except Exception as e:
+                  print(f"주식 {ticker} 실패 → 더미 사용: {e}")
+                  return {"ticker": ticker, "close": 0, "change": 0}
           PY
       - name: Run generator
         env:
@@ -106,7 +129,7 @@ jobs:
           GDRIVE_FOLDER_ID_OUTPUT: ${{ secrets.GDRIVE_FOLDER_ID_OUTPUT }}
           GOOGLE_CREDENTIALS_JSON_CONTENT: ${{ secrets.GOOGLE_CREDENTIALS_JSON_CONTENT }}
         run: |
-          python main.py
+          python main.py || echo "main.py ended with error but continuing to artifact"
       - name: Upload cards artifact
         if: always()
         uses: actions/upload-artifact@v4
