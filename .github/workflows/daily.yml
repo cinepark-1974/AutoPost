@@ -40,7 +40,11 @@ jobs:
                   return build("drive","v3",credentials=creds)
               print("credentials 없음")
               return None
+          def get_background_id():
+              return os.getenv('GDRIVE_FOLDER_ID_BACKGROUND') or os.getenv('GDRIVE_FOLDER_ID_BACKGROUND_IMAGES') or os.getenv('GDRIVE_FOLDER_ID_Background') or ''
           def download_random_background(fid):
+              if not fid:
+                  fid=get_background_id()
               if not fid: return None
               try:
                   s=get_drive_service()
@@ -67,6 +71,7 @@ jobs:
                   print(f"BG 실패: {e}")
                   return None
           def upload_to_drive(local_folder, drive_folder_id=None):
+              user_email=os.getenv('USER_EMAIL') or os.getenv('GDRIVE_USER_EMAIL') or ''
               if not drive_folder_id:
                   print("OUTPUT ID 없음 → 드라이브 스킵")
                   return
@@ -79,16 +84,29 @@ jobs:
                   folder=service.files().create(body=meta, fields="id", supportsAllDrives=True).execute()
                   nid=folder.get("id")
                   print(f"Drive 폴더 생성: {folder_name} ({nid})")
+                  # 폴더 소유권 이전 시도
+                  if user_email:
+                      try:
+                          service.permissions().create(fileId=nid, body={"type":"user","role":"owner","emailAddress":user_email}, transferOwnership=True, supportsAllDrives=True).execute()
+                          print(f"  폴더 소유권 이전: {user_email}")
+                      except Exception as e:
+                          print(f"  폴더 소유권 이전 실패(무시): {e}")
                   for f in Path(local_folder).glob("*"):
                       if not f.is_file(): continue
                       try:
                           media=MediaFileUpload(str(f), resumable=True)
-                          service.files().create(body={"name":f.name,"parents":[nid]}, media_body=media, fields="id", supportsAllDrives=True).execute()
-                          print(f"  업로드: {f.name}")
+                          created=service.files().create(body={"name":f.name,"parents":[nid]}, media_body=media, fields="id", supportsAllDrives=True).execute()
+                          fid=created.get("id")
+                          print(f"  업로드: {f.name} ({fid})")
+                          if user_email:
+                              try:
+                                  service.permissions().create(fileId=fid, body={"type":"user","role":"owner","emailAddress":user_email}, transferOwnership=True, supportsAllDrives=True).execute()
+                              except Exception as oe:
+                                  print(f"    소유권 이전 실패: {oe}")
                       except Exception as e:
                           msg=str(e)
-                          if "storage quota" in msg.lower() or "storageQuotaExceeded" in msg:
-                              print(f"  ! MyDrive quota 에러 - 공유드라이브 필요. {f.name}은 Artifacts에서 확인")
+                          if "storage quota" in msg.lower() or "storageQuotaExceeded" in msg or "quota" in msg.lower():
+                              print(f"  ! quota 에러: {msg[:200]}")
                           else:
                               print(f"  업로드 실패 {f.name}: {e}")
                   print(f"Drive 처리 완료")
@@ -127,7 +145,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           CLAUDE_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GDRIVE_FOLDER_ID_BACKGROUND: ${{ secrets.GDRIVE_FOLDER_ID_BACKGROUND }}
+          GDRIVE_FOLDER_ID_BACKGROUND: ${{ secrets.GDRIVE_FOLDER_ID_BACKGROUND || secrets.GDRIVE_FOLDER_ID_BACKGROUND_IMAGES || secrets.GDRIVE_FOLDER_ID_Background }}
           GDRIVE_FOLDER_ID_OUTPUT: ${{ secrets.GDRIVE_FOLDER_ID_OUTPUT }}
           GOOGLE_CREDENTIALS_JSON_CONTENT: ${{ secrets.GOOGLE_CREDENTIALS_JSON_CONTENT }}
         run: |
