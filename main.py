@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-CINEPARK0410 YouTube Factory - 하이브리드 (Gemini 또는 Claude 자동 선택)
-5분 가로 + 1분20초 세로
+CINEPARK0410 YouTube Factory - 하이브리드 + 실제 영상 제작
 """
 import os
 import json
@@ -18,17 +17,15 @@ def _kst_today():
     return datetime.now(kst).strftime("%Y-%m-%d")
 
 def get_client_type():
-    """어떤 키가 있는지 자동 감지"""
-    if os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_GEMINI_API_KEY"):
+    if os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"):
         return "gemini"
     if os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY"):
         return "claude"
     return None
 
-# ===== Gemini 클라이언트 =====
 def get_gemini_client():
     from google import genai
-    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_GEMINI_API_KEY")
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
     return genai.Client(api_key=api_key)
 
 def gen_json_gemini(client, system_prompt, user_prompt):
@@ -36,14 +33,10 @@ def gen_json_gemini(client, system_prompt, user_prompt):
     response = client.models.generate_content(
         model="gemini-2.5-pro",
         contents=[f"{system_prompt}\n\n{user_prompt}"],
-        config=types.GenerateContentConfig(
-            temperature=0.7,
-            response_mime_type="application/json"
-        )
+        config=types.GenerateContentConfig(temperature=0.7, response_mime_type="application/json")
     )
     text = response.text.strip()
     if "```" in text:
-        # ```json ... ``` 제거
         parts = text.split("```")
         for p in parts:
             p = p.strip()
@@ -54,7 +47,6 @@ def gen_json_gemini(client, system_prompt, user_prompt):
                 break
     return json.loads(text)
 
-# ===== Claude 클라이언트 =====
 def get_claude_client():
     import anthropic
     api_key = os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY")
@@ -81,81 +73,62 @@ def gen_json_claude(client, system_prompt, user_prompt):
 
 def fetch_ourmalsam(keyword: str) -> dict:
     key = os.getenv("OURIMALSAEM_API_KEY", "03372")
-    print(f"[우리말샘] {keyword} 조회 중... (키 {key[:4]}...)")
-    return {
-        "keyword": keyword,
-        "definition": f"{keyword}의 국립국어원 정의",
-        "pos": "명사",
-        "origin": "우리말샘 원문",
-        "raw": f"출처: 국립국어원 우리말샘 Open API - {keyword}"
-    }
+    print(f"[우리말샘] {keyword} 조회")
+    return {"keyword": keyword, "definition": f"{keyword} 정의", "raw": f"출처: 국립국어원 우리말샘 - {keyword}"}
 
 def main():
     client_type = get_client_type()
     if not client_type:
-        raise SystemExit("GEMINI_API_KEY 또는 ANTHROPIC_API_KEY 없음 → Secrets에 키 추가 필요")
+        raise SystemExit("API KEY 없음")
 
-    print(f"=== CINEPARK0410 YouTube Factory ({client_type.upper()}) ===")
-    print(f"QA 기준: {QA_THRESHOLD}점")
+    print(f"=== CINEPARK0410 YouTube Factory ({client_type.upper()}) + VIDEO ===")
 
     if client_type == "gemini":
         client = get_gemini_client()
-        gen_json = lambda sys_p, usr_p: gen_json_gemini(client, sys_p, usr_p)
+        gen_json = lambda s,u: gen_json_gemini(client,s,u)
     else:
         client = get_claude_client()
-        gen_json = lambda sys_p, usr_p: gen_json_claude(client, sys_p, usr_p)
-        print(f"  → Claude 모델 사용: {os.getenv('CLAUDE_MODEL', 'claude-sonnet-4-5')}")
+        gen_json = lambda s,u: gen_json_claude(client,s,u)
 
-    # 주제 자동화
-    candidate_keywords = ["며칠", "웬/왠", "되/돼", "던/든", "로써/로서", "며칠 몇일", "금세/금새", "어떻게/어떡해", "왠지/웬지", "뵈요/봬요"]
-    
-    print(f"[주제 검수] {candidate_keywords} 스코어링 중...")
+    candidate_keywords = ["며칠", "웬/왠", "되/돼", "던/든", "로써/로서", "금세/금새", "어떻게/어떡해", "왠지/웬지", "뵈요/봬요", "며칠 몇일"]
+    print(f"[주제 검수] {candidate_keywords}")
     try:
         scored = gen_json(SYSTEM_PROMPT_TOPIC_SCORER, f"주제어 목록: {candidate_keywords}")
         keyword = scored.get("top_pick") or candidate_keywords[0]
-        print(f"  → Top Pick: {keyword}")
     except Exception as e:
-        print(f"  주제 스코어링 실패, 첫 주제로 진행: {e}")
-        scored = {"top_pick": candidate_keywords[0], "ranked": []}
+        print(f"  실패: {e}")
+        scored = {"top_pick": candidate_keywords[0]}
         keyword = candidate_keywords[0]
 
     ourmalsam_data = fetch_ourmalsam(keyword)
 
-    # 5분 대본 + QA
     user_prompt = USER_PROMPT_TEMPLATE.format(keyword=keyword, ourmalsam_data=json.dumps(ourmalsam_data, ensure_ascii=False), today=_kst_today())
-    
     draft = None
-    for attempt in range(1, 4):
-        print(f"[5분 대본 작성] 시도 {attempt}/3")
+    for attempt in range(1,4):
+        print(f"[5분 대본] 시도 {attempt}/3")
         try:
             draft = gen_json(SYSTEM_PROMPT_WRITER_5MIN, user_prompt)
-            print(f"[내용 검수 QA] {keyword} 채점 중...")
             qa_input = f"ourmalsam_data: {json.dumps(ourmalsam_data, ensure_ascii=False)}\n대본: {json.dumps(draft, ensure_ascii=False)}"
             qa = gen_json(SYSTEM_PROMPT_QA, qa_input)
-            score = qa.get("total_score", 0)
-            print(f"  → QA 점수: {score}점 / {qa.get('feedback')}")
-            if score >= QA_THRESHOLD:
+            print(f"  QA: {qa.get('total_score')}점")
+            if qa.get("total_score",0) >= QA_THRESHOLD:
                 draft["_qa"] = qa
                 break
-            else:
-                user_prompt += f"\n\n[이전 QA 피드백 - 반드시 수정] {qa.get('feedback')} (점수 {score}점)"
-                draft["_qa"] = qa
+            user_prompt += f"\n[피드백] {qa.get('feedback')}"
+            draft["_qa"] = qa
         except Exception as e:
-            print(f"  생성 실패: {e}")
+            print(f"  실패: {e}")
             time.sleep(2)
-            continue
 
     if not draft:
-        raise SystemExit("대본 생성 실패 - 3회 재시도 후 중단")
+        raise SystemExit("대본 실패")
 
-    # 쇼츠
-    print(f"[쇼츠 1분20초 압축] {keyword}")
+    print(f"[쇼츠 압축]")
     try:
         data_shorts = gen_json(SYSTEM_PROMPT_WRITER_SHORTS, f"5분 대본: {json.dumps(draft, ensure_ascii=False)}")
     except:
         data_shorts = {"keyword": keyword, "script_80sec": draft.get("full_script_5min","")[:400]}
 
-    # 저장
     date_str = _kst_today()
     output_dir = f"{OUTPUT_BASE}/{date_str}_{keyword}_dual"
     os.makedirs(output_dir, exist_ok=True)
@@ -167,8 +140,17 @@ def main():
     with open(f"{output_dir}/script_80sec.txt", "w", encoding="utf-8") as f:
         f.write(data_shorts.get("script_80sec",""))
 
-    print(f"\n=== 생성 완료 ===")
-    print(f"폴더: {output_dir}")
+    # ===== 동영상 제작 =====
+    print(f"\n[동영상 제작 시작]")
+    try:
+        from video_factory import build_dual_videos
+        final_h, final_v = build_dual_videos(draft, data_shorts, output_dir)
+        print(f"  가로: {final_h}")
+        print(f"  세로: {final_v}")
+    except Exception as e:
+        print(f"  영상 제작 실패 (대본은 저장됨): {e}")
+        import traceback
+        traceback.print_exc()
 
     try:
         from drive_uploader import upload_to_drive
