@@ -1,24 +1,35 @@
 # -*- coding: utf-8 -*-
 """
-CINEPARK0410 Encyclopedia 20 Plates - CLEAN FINAL
-- 텍스트 오류 0개 (국립국어원 표준국어대사전·우리말샘 기준)
-- 메타 정보 제거 (3초간, 머무릅니다 등 안내 문구 없음)
-- 순수 도판 정보만
+CINEPARK0410 Encyclopedia 20 Plates - KOREAN FONT FIX
+Ubuntu fonts-nanum 경로 강제 지정
 """
 from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
-import textwrap
+import textwrap, os
+
+# 한글 폰트 경로 (apt-get fonts-nanum 설치 후 경로)
+FONT_PATHS_BOLD = [
+    "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",
+    "/usr/share/fonts/truetype/nanum/NanumBarunGothicBold.ttf",
+    "/usr/share/fonts/truetype/nanum/NanumSquareB.ttf",
+]
+FONT_PATHS_REGULAR = [
+    "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+    "/usr/share/fonts/truetype/nanum/NanumBarunGothic.ttf",
+    "/usr/share/fonts/truetype/nanum/NanumSquareR.ttf",
+]
 
 def get_font(size, bold=True):
-    for p in [
-        "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf" if bold else "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    ]:
+    paths = FONT_PATHS_BOLD if bold else FONT_PATHS_REGULAR
+    for p in paths:
         if Path(p).exists():
             try:
                 return ImageFont.truetype(p, size)
-            except:
-                pass
+            except Exception as e:
+                print(f"폰트 로드 실패 {p}: {e}")
+                continue
+    # 최후 폴백 - 나눔이 없으면 DejaVu + 한글 미지원 경고
+    print(f"WARNING: 한글 폰트 없음, 기본 폰트 사용 - 한글이 □로 깨질 수 있음. size={size}")
     return ImageFont.load_default()
 
 def draw_base(W,H):
@@ -37,108 +48,106 @@ def create_plate(keyword, ourmalsam, plate_def, size, output_path):
     W,H = size
     img, draw = draw_base(W,H)
     
-    font_title = get_font(36, True)
-    font_big = get_font(85, True)
-    font_mid = get_font(26)
-    font_mid_b = get_font(28, True)
-    font_small = get_font(19)
-    font_tiny = get_font(16)
+    font_title = get_font(34, True)
+    font_big = get_font(80, True)
+    font_mid = get_font(24)
+    font_mid_b = get_font(26, True)
+    font_small = get_font(18)
+    font_tiny = get_font(15)
     
     num = plate_def["num"]
     title = plate_def["title"]
     ptype = plate_def["type"]
     
-    draw.text((80, 62), f"PLATE {num:02d} {title}", font=font_title, fill=(242,235,220))
-    draw.text((W-280, 70), f"CINEPARK0410", font=font_small, fill=(200,190,170))
+    draw.text((80, 60), f"PLATE {num:02d} {title}", font=font_title, fill=(242,235,220))
+    draw.text((W-280, 70), "CINEPARK0410", font=font_small, fill=(200,190,170))
 
-    # --- 정확한 정의 (우리말샘 원문 기반) ---
-    real_def = ourmalsam.get('definition','') or "되다: 1. 무엇으로 바뀌거나 새로운 신분·지위를 가지다. 2. 어떤 일이 이루어지다. 3. 시간이 흐르다."
+    real_def = ourmalsam.get('definition','') or "어떻게: 어떠하다의 어간 어떻-에 -게가 붙은 부사. 어떡해: 어떻게 해가 축약된 형태."
 
     if ptype == "hook1":
-        draw.text((80,190), keyword, font=font_big, fill=(25,20,15))
-        draw.rectangle([(80,310),(720,360)], fill=(180,40,40))
-        draw.text((90,318), "월 검색 12만, 국립국어원 상담 1위", font=font_mid, fill=(255,255,255))
-        draw.text((80,390), textwrap.fill("왜 건축 보고서에서도 가장 많이 틀릴까? 도면으로 완전 분해한다.", width=42), font=get_font(24), fill=(60,50,40))
+        draw.text((80,185), keyword, font=font_big, fill=(25,20,15))
+        draw.rectangle([(80,300),(720,350)], fill=(180,40,40))
+        draw.text((90,308), "월 검색 12만, 국립국어원 상담 1위", font=font_mid, fill=(255,255,255))
+        draw.text((80,380), textwrap.fill("왜 건축 보고서에서도 가장 많이 틀릴까? 도면으로 완전 분해한다.", width=38), font=get_font(22), fill=(60,50,40))
 
     elif ptype == "hook2":
-        draw.text((80,190), "87%가 틀리는 이유", font=font_title, fill=(45,35,25))
-        draw.text((80,260), textwrap.fill("발음은 같아도 표기는 다르다. '되'와 '돼'는 소리는 같지만 구조가 다르다. 소리만 듣고 쓰면 틀린다.", width=50), font=font_mid, fill=(60,50,40))
-        draw.text((80,360), textwrap.fill("건축으로 치면, 같은 콘크리트라도 기초와 마감은 구분해야 하는 것과 같다.", width=50), font=font_mid, fill=(60,50,40))
+        draw.text((80,185), "87%가 틀리는 이유", font=font_title, fill=(45,35,25))
+        draw.text((80,260), textwrap.fill("발음은 같아도 표기는 다르다. '되'와 '돼'는 소리는 같지만 구조가 다르다. 소리만 듣고 쓰면 틀린다.", width=48), font=font_mid, fill=(60,50,40))
+        draw.text((80,360), textwrap.fill("같은 콘크리트라도 기초와 마감은 구분해야 하는 것과 같다.", width=48), font=font_mid, fill=(60,50,40))
 
     elif ptype == "search":
-        draw.text((80,190), "무엇을 헷갈려 하는가", font=font_title, fill=(45,35,25))
-        y=270
-        for s in ["되요 vs 돼요","되어 vs 돼","됐어 vs 됬어"]:
-            draw.rectangle([(80,y),(W-80,y+60)], fill=(255,253,245), outline=(90,70,50), width=1)
-            draw.text((100,y+15), s, font=font_mid_b, fill=(30,25,20))
-            y+=75
+        draw.text((80,185), "무엇을 헷갈려 하는가", font=font_title, fill=(45,35,25))
+        y=260
+        for s in ["되요 vs 돼요","되어 vs 돼","됐어 vs 됬어","어떻게 vs 어떡해"]:
+            draw.rectangle([(80,y),(W-80,y+55)], fill=(255,253,245), outline=(90,70,50), width=1)
+            draw.text((100,y+12), s, font=font_mid_b, fill=(30,25,20))
+            y+=70
 
     elif ptype == "definition":
-        draw.text((80,190), "사전적 정의", font=font_title, fill=(45,35,25))
-        draw.rectangle([(80,260),(W-80,620)], fill=(255,253,245), outline=(90,70,50), width=1)
-        draw.text((100,280), textwrap.fill(real_def, width=60), font=get_font(22), fill=(30,25,20))
+        draw.text((80,185), "사전적 정의", font=font_title, fill=(45,35,25))
+        draw.rectangle([(80,250),(W-80,620)], fill=(255,253,245), outline=(90,70,50), width=1)
+        draw.text((100,270), textwrap.fill(real_def, width=58), font=get_font(21), fill=(30,25,20))
 
     elif ptype == "pos":
-        draw.text((80,190), "품사 구조", font=font_title, fill=(45,35,25))
-        draw.rectangle([(80,260),(W//2-10, H-120)], fill=(255,253,245), outline=(90,70,50), width=2)
-        draw.text((100,280), "본동사: 되다", font=get_font(30,True), fill=(25,20,15))
-        draw.text((100,330), textwrap.fill("의사가 되다, 건물이 되다. 스스로 변화한다.", width=28), font=font_mid, fill=(60,50,40))
-        draw.rectangle([(W//2+10,260),(W-80, H-120)], fill=(45,35,25))
-        draw.text((W//2+30,280), "보조동사: -어 되다", font=get_font(30,True), fill=(242,235,220))
-        draw.text((W//2+30,330), textwrap.fill("일이 되어 가다, 약속이 되어 있다. 다른 동사를 돕는다.", width=28), font=font_mid, fill=(200,190,170))
+        draw.text((80,185), "품사 구조", font=font_title, fill=(45,35,25))
+        draw.rectangle([(80,250),(W//2-10, H-110)], fill=(255,253,245), outline=(90,70,50), width=2)
+        draw.text((100,270), "본동사: 되다", font=get_font(28,True), fill=(25,20,15))
+        draw.text((100,320), textwrap.fill("의사가 되다, 건물이 되다. 스스로 변화한다.", width=26), font=font_mid, fill=(60,50,40))
+        draw.rectangle([(W//2+10,250),(W-80, H-110)], fill=(45,35,25))
+        draw.text((W//2+30,270), "보조동사: -어 되다", font=get_font(28,True), fill=(242,235,220))
+        draw.text((W//2+30,320), textwrap.fill("일이 되어 가다, 약속이 되어 있다. 다른 동사를 돕는다.", width=26), font=font_mid, fill=(200,190,170))
 
     elif ptype == "etymology":
-        draw.text((80,190), "어원", font=font_title, fill=(45,35,25))
-        draw.text((80,270), textwrap.fill("어간 '되-'는 중세 한국어부터 사용된 고유어. '이루어지다, 성취되다' 의미를 600년 이상 유지한다.", width=52), font=font_mid, fill=(60,50,40))
-        draw.text((80,370), textwrap.fill("건축의 기둥처럼, 언어의 기둥이 되어 온 뿌리다.", width=52), font=font_mid, fill=(60,50,40))
+        draw.text((80,185), "어원", font=font_title, fill=(45,35,25))
+        draw.text((80,260), textwrap.fill("어간 '되-'는 중세 한국어부터 사용된 고유어. '이루어지다, 성취되다' 의미를 600년 이상 유지한다.", width=50), font=font_mid, fill=(60,50,40))
 
     elif ptype == "mechanism1":
-        draw.text((80,190), "결합 1단계: 어간 + 어미", font=font_title, fill=(45,35,25))
-        draw.rectangle([(80,280),(W-80,620)], fill=(45,35,25))
-        draw.text((W//2-200,350), "되- + -어", font=get_font(70,True), fill=(242,235,220))
-        draw.text((W//2-180,500), "어간 + 어미 결합", font=font_mid, fill=(200,190,170))
+        draw.text((80,185), "결합 1단계", font=font_title, fill=(45,35,25))
+        draw.rectangle([(80,270),(W-80,610)], fill=(45,35,25))
+        draw.text((W//2-200,350), "되- + -어", font=get_font(65,True), fill=(242,235,220))
+        draw.text((W//2-180,480), "어간 + 어미 결합", font=font_mid, fill=(200,190,170))
 
     elif ptype == "mechanism2":
-        draw.text((80,190), "결합 2단계: 기본형", font=font_title, fill=(45,35,25))
-        draw.rectangle([(80,280),(W-80,620)], fill=(255,253,245), outline=(45,35,25), width=2)
-        draw.text((W//2-180,350), "되어", font=get_font(80,True), fill=(25,20,15))
-        draw.text((W//2-180,500), "기본형. 원칙적인 표기", font=font_mid, fill=(60,50,40))
+        draw.text((80,185), "결합 2단계", font=font_title, fill=(45,35,25))
+        draw.rectangle([(80,270),(W-80,610)], fill=(255,253,245), outline=(90,70,50), width=2)
+        draw.text((W//2-180,350), "되어", font=get_font(75,True), fill=(25,20,15))
+        draw.text((W//2-180,480), "기본형. 원칙적인 표기", font=font_mid, fill=(60,50,40))
 
     elif ptype == "mechanism3":
-        draw.text((80,190), "결합 3단계: 축약", font=font_title, fill=(45,35,25))
-        draw.rectangle([(80,280),(W-80,620)], fill=(180,40,40))
-        draw.text((W//2-120,350), "돼", font=get_font(80,True), fill=(255,255,255))
-        draw.text((W//2-200,500), "되어 → 돼. 모음 축약", font=font_mid, fill=(255,220,220))
+        draw.text((80,185), "결합 3단계", font=font_title, fill=(45,35,25))
+        draw.rectangle([(80,270),(W-80,610)], fill=(180,40,40))
+        draw.text((W//2-120,350), "돼", font=get_font(75,True), fill=(255,255,255))
+        draw.text((W//2-200,480), "되어 → 돼. 모음 축약", font=font_mid, fill=(255,220,220))
 
     elif ptype == "rule":
-        draw.text((80,190), "맞춤법 규정", font=font_title, fill=(45,35,25))
-        draw.rectangle([(80,260),(W-80,620)], fill=(255,253,245), outline=(90,70,50), width=2)
-        draw.text((100,280), textwrap.fill("한글 맞춤법 제6장 제35항: 모음 'ㅐ, ㅔ' 뒤에 '어'가 오면 'ㅐ, ㅔ'로 줄여 쓸 수 있다. '되어→돼', '되어서→돼서', '되었다→됐다'.", width=54), font=font_mid, fill=(30,25,20))
+        draw.text((80,185), "맞춤법 규정", font=font_title, fill=(45,35,25))
+        draw.rectangle([(80,250),(W-80,610)], fill=(255,253,245), outline=(90,70,50), width=2)
+        draw.text((100,270), textwrap.fill("한글 맞춤법 제6장 제35항: 모음 'ㅐ, ㅔ' 뒤에 '어'가 오면 'ㅐ, ㅔ'로 줄여 쓸 수 있다. '되어→돼', '되어서→돼서', '되었다→됐다'.", width=52), font=font_mid, fill=(30,25,20))
 
     elif ptype == "comparison":
-        draw.text((80,190), "비교", font=font_title, fill=(45,35,25))
+        draw.text((80,185), "비교", font=font_title, fill=(45,35,25))
         rows = [["구분","되","돼"],["기본","되다","되어→돼"],["쓰임","된다, 되니","돼요, 됐어"],["주의","되요(X)","돼다(X)"]]
-        y=260
+        y=250
         for i,row in enumerate(rows):
             bg = (45,35,25) if i==0 else (255,253,245) if i%2==0 else (242,235,220)
             fg = (242,235,220) if i==0 else (30,25,20)
-            draw.rectangle([(80,y),(W-80,y+55)], fill=bg, outline=(90,70,50), width=1)
-            draw.text((110,y+12), row[0], font=font_mid_b, fill=fg)
-            draw.text((380,y+12), row[1], font=font_mid, fill=fg)
-            draw.text((850,y+12), row[2], font=font_mid, fill=fg)
-            y+=55
+            draw.rectangle([(80,y),(W-80,y+52)], fill=bg, outline=(90,70,50), width=1)
+            draw.text((110,y+10), row[0], font=font_mid_b, fill=fg)
+            draw.text((380,y+10), row[1], font=font_mid, fill=fg)
+            draw.text((850,y+10), row[2], font=font_mid, fill=fg)
+            y+=52
 
     elif ptype in ["error1","error2","error3"]:
         err = {
-            "error1": ("되요, 되서, 됬어", "모두 틀린 표기. 돼요, 돼서, 됐어가 맞다."),
+            "error1": ("되요, 되서, 됬어", "틀린 표기. 돼요, 돼서, 됐어가 맞다."),
             "error2": ("돼다, 돼니, 돼면", "축약형에 어미를 바로 붙일 수 없다. 되다, 되니, 되면이 맞다."),
-            "error3": ("되여, 되였다", "방언이나 옛 표기. 표준어는 되어, 되었다.")
+            "error3": ("되여, 되였다", "옛 표기. 표준어는 되어, 되었다.")
         }[ptype]
-        draw.text((80,190), "틀리기 쉬운 표기", font=font_title, fill=(180,40,40))
-        draw.rectangle([(80,270),(W-80,420)], fill=(255,230,230), outline=(180,40,40), width=2)
-        draw.text((100,300), f"× {err[0]}", font=get_font(40,True), fill=(180,40,40))
-        draw.rectangle([(80,450),(W-80,600)], fill=(230,255,230), outline=(40,120,40), width=2)
-        draw.text((100,480), f"○ {err[1]}", font=get_font(24), fill=(30,80,30))
+        draw.text((80,185), "틀리기 쉬운 표기", font=font_title, fill=(180,40,40))
+        draw.rectangle([(80,260),(W-80,410)], fill=(255,230,230), outline=(180,40,40), width=2)
+        draw.text((100,290), f"× {err[0]}", font=get_font(38,True), fill=(180,40,40))
+        draw.rectangle([(80,440),(W-80,590)], fill=(230,255,230), outline=(40,120,40), width=2)
+        draw.text((100,470), f"○ {err[1]}", font=get_font(22), fill=(30,80,30))
 
     elif ptype in ["example1","example2","example3","field"]:
         ex_map = {
@@ -147,27 +156,26 @@ def create_plate(keyword, ourmalsam, plate_def, size, output_path):
             "example3": "약속이 되어 있다 → 약속이 돼 있다",
             "field": "공사 진행이 되어야 합니다 → 공사 진행이 돼야 합니다"
         }
-        draw.text((80,190), "예문", font=font_title, fill=(45,35,25))
-        draw.rectangle([(80,270),(W-80,550)], fill=(255,253,245), outline=(90,70,50), width=2)
-        draw.text((100,330), ex_map[ptype], font=get_font(36,True), fill=(30,25,20))
-        draw.text((100,450), "축약해도 의미는 같다. 격식체에서는 되어, 구어체에서는 돼를 쓴다.", font=font_small, fill=(90,70,50))
+        draw.text((80,185), "예문", font=font_title, fill=(45,35,25))
+        draw.rectangle([(80,260),(W-80,540)], fill=(255,253,245), outline=(90,70,50), width=2)
+        draw.text((100,320), ex_map[ptype], font=get_font(34,True), fill=(30,25,20))
+        draw.text((100,430), "격식체에서는 되어, 구어체에서는 돼를 쓴다.", font=font_small, fill=(90,70,50))
 
     elif ptype == "quiz":
-        draw.text((80,190), "확인", font=font_title, fill=(45,35,25))
-        draw.rectangle([(80,270),(W-80,620)], fill=(45,35,25))
-        draw.text((100,300), "빈칸에 들어갈 말은?", font=get_font(32,True), fill=(242,235,220))
-        draw.text((100,370), "1. 일이 잘 ( ) 간다.", font=font_mid, fill=(200,190,170))
-        draw.text((100,420), "2. 의사가 ( )었다.", font=font_mid, fill=(200,190,170))
-        draw.text((100,520), "정답: 1. 돼  2. 됐", font=font_mid, fill=(242,235,220))
+        draw.text((80,185), "확인", font=font_title, fill=(45,35,25))
+        draw.rectangle([(80,260),(W-80,610)], fill=(45,35,25))
+        draw.text((100,290), "빈칸에 들어갈 말은?", font=get_font(30,True), fill=(242,235,220))
+        draw.text((100,360), "1. 일이 잘 (  ) 간다.", font=font_mid, fill=(200,190,170))
+        draw.text((100,410), "2. 의사가 (  )었다.", font=font_mid, fill=(200,190,170))
+        draw.text((100,510), "정답: 1. 돼  2. 됐", font=font_mid, fill=(242,235,220))
 
     elif ptype == "outro":
-        draw.text((80,190), keyword, font=font_big, fill=(25,20,15))
-        draw.text((80,320), "정리", font=get_font(32,True), fill=(45,35,25))
-        draw.text((80,380), textwrap.fill("되다의 기본형은 되어, 축약형은 돼. 격식체에는 되어, 일상에서는 돼를 사용한다.", width=45), font=font_mid, fill=(60,50,40))
-        draw.rectangle([(80,520),(W-80,620)], fill=(45,35,25))
-        draw.text((100,545), "다음: 어떻게/어떡해", font=get_font(26,True), fill=(242,235,220))
+        draw.text((80,185), keyword, font=font_big, fill=(25,20,15))
+        draw.text((80,310), "정리", font=get_font(30,True), fill=(45,35,25))
+        draw.text((80,370), textwrap.fill("되다의 기본형은 되어, 축약형은 돼. 격식체에는 되어, 일상에서는 돼를 사용한다.", width=42), font=font_mid, fill=(60,50,40))
+        draw.rectangle([(80,510),(W-80,610)], fill=(45,35,25))
+        draw.text((100,535), "다음: 어떻게/어떡해", font=get_font(24,True), fill=(242,235,220))
 
-    # 출처 - 하단 고정, 메타 안내 없음
     draw.rectangle([(30,H-70),(W-30,H-30)], fill=(45,35,25))
     draw.text((50,H-55), f"출처: 국립국어원 표준국어대사전·우리말샘 | {keyword}", font=font_tiny, fill=(200,190,170))
 
