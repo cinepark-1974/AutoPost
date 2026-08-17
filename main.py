@@ -1,18 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-CINEPARK0410 Main - 20 Plates Clean Final
-- 실제 우리말샘 API
-- 20장 도판, 텍스트 오류 0, 메타 문구 제거
-- Vids 최적화 (이미지만)
+CINEPARK0410 Main - 영화 시나리오 맞춤법 20장 버전
 """
 import os, json, time
-from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 load_dotenv()
 
 from config import OUTPUT_BASE, GDRIVE_OUTPUT_ID, QA_THRESHOLD
 from prompts import SYSTEM_PROMPT_WRITER_5MIN, SYSTEM_PROMPT_WRITER_SHORTS, SYSTEM_PROMPT_QA, SYSTEM_PROMPT_TOPIC_SCORER, USER_PROMPT_TEMPLATE
 from ourmalsam_client import fetch_ourmalsam_real
+from datetime import datetime, timezone, timedelta
 
 def _kst_today():
     kst = timezone(timedelta(hours=9))
@@ -68,7 +65,7 @@ def gen_json_claude(client, system_prompt, user_prompt):
 def main():
     client_type = get_client_type()
     if not client_type: raise SystemExit("API KEY 없음")
-    print(f"=== CINEPARK0410 20 PLATES CLEAN ({client_type.upper()}) ===")
+    print(f"=== CINEPARK0410 영화 시나리오 맞춤법 20장 ({client_type.upper()}) ===")
 
     if client_type == "gemini":
         client = get_gemini_client()
@@ -77,7 +74,7 @@ def main():
         client = get_claude_client()
         gen_json = lambda s,u: gen_json_claude(client,s,u)
 
-    candidate_keywords = ["되/돼", "며칠", "웬/왠", "어떻게/어떡해", "던/든", "로써/로서", "금세/금새", "왠지/웬지"]
+    candidate_keywords = ["되/돼", "며칠", "웬/왠", "어떻게/어떡해", "던/든", "로써/로서", "금세/금새"]
     try:
         scored = gen_json(SYSTEM_PROMPT_TOPIC_SCORER, f"주제어 목록: {candidate_keywords}")
         keyword = scored.get("top_pick") or candidate_keywords[0]
@@ -86,14 +83,17 @@ def main():
         keyword = candidate_keywords[0]
 
     ourmalsam_data = fetch_ourmalsam_real(keyword)
-    print(f"[우리말샘] {ourmalsam_data.get('definition','')[:100]}")
+    print(f"[우리말샘] {ourmalsam_data.get('definition','')[:80]}")
 
     user_prompt = USER_PROMPT_TEMPLATE.format(keyword=keyword, ourmalsam_data=json.dumps(ourmalsam_data, ensure_ascii=False), today=_kst_today())
+    # 영화 시나리오 톤 강제
+    user_prompt += "\n추가 지시: 영화 시나리오 맞춤법에서 출발. 건축 비유 금지, 영화 시나리오, 대사, 내레이션, 인물, 클라이맥스, 복선 등 영화 용어로 설명. 채널은 CINEPARK0410 영화 채널."
+
     draft = None
     for attempt in range(1,4):
-        print(f"[5분 대본] {attempt}/3")
+        print(f"[5분 대본 - 영화 시나리오 톤] {attempt}/3")
         try:
-            draft = gen_json(SYSTEM_PROMPT_WRITER_5MIN, user_prompt + "\n지시: 신비한 건축사전 톤, 건축 비유 사용, 텍스트 오류 없이 작성.")
+            draft = gen_json(SYSTEM_PROMPT_WRITER_5MIN, user_prompt)
             qa_input = f"ourmalsam_data: {json.dumps(ourmalsam_data, ensure_ascii=False)}\n대본: {json.dumps(draft, ensure_ascii=False)}"
             qa = gen_json(SYSTEM_PROMPT_QA, qa_input)
             print(f"  QA {qa.get('total_score')}점")
@@ -112,7 +112,7 @@ def main():
         data_shorts = {"keyword": keyword, "script_80sec": draft.get("full_script_5min","")[:400]}
 
     date_str = _kst_today()
-    output_dir = f"{OUTPUT_BASE}/{date_str}_{keyword}_20plates"
+    output_dir = f"{OUTPUT_BASE}/{date_str}_{keyword}_film20"
     os.makedirs(output_dir, exist_ok=True)
 
     with open(f"{output_dir}/meta.json", "w", encoding="utf-8") as f:
@@ -122,16 +122,10 @@ def main():
     with open(f"{output_dir}/script_80sec.txt", "w", encoding="utf-8") as f:
         f.write(data_shorts.get("script_80sec",""))
 
-    print("\n[20장 도판 생성 - 클린 버전]")
+    print("\n[20장 도판 생성 - 영화 시나리오 버전, 단어 단위 줄바꿈]")
     try:
-        from encyclopedia_factory_20_clean import build_20_plates
-        h,v = build_20_plates(keyword, ourmalsam_data, output_dir)
-        # Vids용 챕터
-        chapters = []
-        for i,ch in enumerate(draft.get("chapters", [])[:5]):
-            chapters.append({"scene": i+1, "title": ch.get("title",""), "script": ch.get("script","")})
-        with open(f"{output_dir}/vids_package/chapters.json", "w", encoding="utf-8") as f:
-            json.dump(chapters, f, ensure_ascii=False, indent=2)
+        from encyclopedia_factory_film_20 import build_20_plates_film
+        h,v = build_20_plates_film(keyword, ourmalsam_data, output_dir)
         print(f"  20장 완성")
     except Exception as e:
         print(f"  도판 실패: {e}")
