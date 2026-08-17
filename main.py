@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-CINEPARK0410 Main - 영화 시나리오 맞춤법 20장 버전
+CINEPARK0410 Main - 다크 시네마틱 + 영화 시나리오 3요소(씬/대사/지문) 20장
 """
 import os, json, time
 from dotenv import load_dotenv
@@ -65,7 +65,7 @@ def gen_json_claude(client, system_prompt, user_prompt):
 def main():
     client_type = get_client_type()
     if not client_type: raise SystemExit("API KEY 없음")
-    print(f"=== CINEPARK0410 영화 시나리오 맞춤법 20장 ({client_type.upper()}) ===")
+    print(f"=== CINEPARK0410 다크 시네마 + 시나리오 3요소 20장 ({client_type.upper()}) ===")
 
     if client_type == "gemini":
         client = get_gemini_client()
@@ -83,15 +83,13 @@ def main():
         keyword = candidate_keywords[0]
 
     ourmalsam_data = fetch_ourmalsam_real(keyword)
-    print(f"[우리말샘] {ourmalsam_data.get('definition','')[:80]}")
 
     user_prompt = USER_PROMPT_TEMPLATE.format(keyword=keyword, ourmalsam_data=json.dumps(ourmalsam_data, ensure_ascii=False), today=_kst_today())
-    # 영화 시나리오 톤 강제
-    user_prompt += "\n추가 지시: 영화 시나리오 맞춤법에서 출발. 건축 비유 금지, 영화 시나리오, 대사, 내레이션, 인물, 클라이맥스, 복선 등 영화 용어로 설명. 채널은 CINEPARK0410 영화 채널."
+    user_prompt += "\n추가 지시: 영화 시나리오 맞춤법에서 출발. 시나리오는 씬, 대사, 지문 세 종류로 이루어진다. 건축 비유 금지, 씬/대사/지문으로 설명. 채널은 CINEPARK0410 영화 채널. 출처는 국립국어원 표준국어대사전·우리말샘."
 
     draft = None
     for attempt in range(1,4):
-        print(f"[5분 대본 - 영화 시나리오 톤] {attempt}/3")
+        print(f"[5분 대본 - 씬/대사/지문 톤] {attempt}/3")
         try:
             draft = gen_json(SYSTEM_PROMPT_WRITER_5MIN, user_prompt)
             qa_input = f"ourmalsam_data: {json.dumps(ourmalsam_data, ensure_ascii=False)}\n대본: {json.dumps(draft, ensure_ascii=False)}"
@@ -112,7 +110,7 @@ def main():
         data_shorts = {"keyword": keyword, "script_80sec": draft.get("full_script_5min","")[:400]}
 
     date_str = _kst_today()
-    output_dir = f"{OUTPUT_BASE}/{date_str}_{keyword}_film20"
+    output_dir = f"{OUTPUT_BASE}/{date_str}_{keyword}_dark20"
     os.makedirs(output_dir, exist_ok=True)
 
     with open(f"{output_dir}/meta.json", "w", encoding="utf-8") as f:
@@ -122,11 +120,11 @@ def main():
     with open(f"{output_dir}/script_80sec.txt", "w", encoding="utf-8") as f:
         f.write(data_shorts.get("script_80sec",""))
 
-    print("\n[20장 도판 생성 - 영화 시나리오 버전, 단어 단위 줄바꿈]")
+    print("\n[20장 도판 생성 - 다크 시네마 + 씬/대사/지문]")
     try:
-        from encyclopedia_factory_film_20 import build_20_plates_film
-        h,v = build_20_plates_film(keyword, ourmalsam_data, output_dir)
-        print(f"  20장 완성")
+        from encyclopedia_factory_dark_cinema import build_20_plates_dark
+        h,v = build_20_plates_dark(keyword, ourmalsam_data, output_dir)
+        print(f"  20장 완성 - 색감: {['#04050E','#080B22']} 그라데이션")
     except Exception as e:
         print(f"  도판 실패: {e}")
         import traceback; traceback.print_exc()
