@@ -1,64 +1,65 @@
 # -*- coding: utf-8 -*-
 import os
 
-# ===== 비용 안전장치: 검색 횟수 상한 =====
-MAX_SEARCHES = int(os.getenv("MAX_SEARCHES", "10"))
+# ===== 구글 올인원 팩토리 설정 =====
+# CINEPARK0410 전용: 5분 가로 + 1분20초 세로
 
-# 모델
-MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-5")
-MAX_TOKENS = 4000
+# 하네스 버전 - 이 숫자만 올리면 AI가 알아서 더 깎음
+HARNESS_VERSION = "v4.1_credibility"
 
-# ===== 카드 스타일 토큰 =====
-# BG는 이제 단색이 아니라 그라데이션 + 글로우 조합으로 정의
-# 기존 BG = "#070A1A"는 두 색의 평균이라 하위호환용으로 남겨둠
+# ===== 출력 규격 =====
+HORIZONTAL = {"w": 1920, "h": 1080, "duration_sec": 300}  # 5분
+VERTICAL = {"w": 1080, "h": 1920, "duration_sec": 80}   # 1분20초
 
-BG = "#070A1A" # fallback 단색
-BG_GRADIENT = ["#04050E", "#080B22"] # 색1, 색2
-BG_ANGLE = 160 # 대각선 방향
+# ===== 신뢰도 하네스 =====
+# 이 토큰은 모든 프롬프트에 강제 주입됨
+CREDIBILITY_HARNESS = """
+[신뢰도 하네스 - 절대 규칙]
+1. 모든 맞춤법 설명은 국립국어원 우리말샘 Open API 데이터를 1차 출처로 한다. 우리말샘에 없는 설명은 하지 않는다.
+2. 화면에 반드시 '출처: 국립국어원 우리말샘' 자막을 3초 이상 노출한다.
+3. 영화 프로듀서 관점에서 말한다. 예: '시나리오에 이렇게 쓰면 투자 심사에서 바로 탈락합니다'
+4. 낚시 제목 금지. 정확한 정보만.
+5. 건축 도해 비유를 반드시 1개 이상 사용한다. 예: '며칠은 건물의 뼈대처럼 붙어 쓰는 말입니다'
+"""
 
-# 글로우 효과 - Canva에서 원+블러로 하던거
-GLOWS = [
-    {
-        "color": "#4CC9F0", # 하늘색 글로우
-        "opacity": 0.12, # 10~15% -> 0.12
-        "blur": 120, # 블러 최대
-        "position": "top_right", # 우상단
-        "size": 700,
-    },
-    {
-        "color": "#03045E", # 딥블루 글로우
-        "opacity": 0.55,
-        "blur": 100,
-        "position": "bottom_left", # 좌하단
-        "size": 600,
-    }
-]
+# ===== AI 스코어링 QA 기준 =====
+# 주제 검수
+TOPIC_SCORE_WEIGHTS = {
+    "search_volume": 0.30,  # 네이버 월 검색량
+    "competition": 0.20,    # 유튜브 경쟁도 낮을수록 고득점
+    "educational": 0.20,    # 교육적 가치
+    "viral": 0.20,          # 쇼츠 바이럴 가능성
+    "duplicate": 0.10       # 기존 CINEPARK 채널 중복 여부
+}
 
-TXT = "#E6EAF2"
-SUB = "#9DB0C8"
+# 내용 검수 - 100점 만점, 85점 미만이면 재생성
+CONTENT_QA_RUBRIC = {
+    "fact_accuracy": 30,      # 우리말샘과 일치하는가
+    "producer_insight": 25,   # 프로듀서 관점 코멘트 있는가
+    "blueprint_visual": 20,   # 건축 도해 설명 있는가
+    "retention_hook": 15,     # 3초 훅 있는가
+    "source_display": 10      # 출처 명시 있는가
+}
+QA_THRESHOLD = 85
+
+# ===== 모델 =====
+# 구글 올인원: Gemini 1개로 작가/채점자 역할 분리
+GEMINI_MODEL_WRITER = os.getenv("GEMINI_MODEL", "gemini-2.5-pro")
+GEMINI_MODEL_QA = os.getenv("GEMINI_MODEL", "gemini-2.5-pro")
+
+# ===== 경로 =====
+OUTPUT_BASE = "output"
+GDRIVE_OUTPUT_ID = os.getenv("GDRIVE_FOLDER_ID_OUTPUT", "")
+GDRIVE_BACKGROUND_ID = os.getenv("GDRIVE_FOLDER_ID_BACKGROUND", "")
+
+# ===== 우리말샘 API =====
+OURIMAL_API_KEY = os.getenv("OURIMALSAEM_API_KEY", "03372")
+OURIMAL_API_URL = "https://opendict.korean.go.kr/api"
+
+# ===== 스타일 토큰 (CINEPARK 브랜딩) =====
+BG = "#070A1A"
+BG_GRADIENT = ["#04050E", "#080B22"]
 BLUE = "#4CC9F0"
 GOLD = "#F4C56A"
-GREEN = "#34D399"
-RED = "#EF4444"
-FRAME = "rgba(76,201,240,0.25)"
-
-CARD_W = 1080
-CARD_H = 1920
-SAFE_TOP = 220
-SAFE_BOTTOM = 380
-
-# ===== 경로 / 드라이브 =====
-OUTPUT_BASE = "output"
-GDRIVE_OUTPUT_ID = os.getenv("GDRIVE_FOLDER_ID_OUTPUT") or os.getenv("GDRIVE_FOLDER_ID_Output") or ""
-
-TICKER_MAP = {
-    "Disney": "DIS", "Marvel": "DIS", "Pixar": "DIS", "Lucasfilm": "DIS",
-    "Warner": "WBD", "Warner Bros": "WBD", "HBO": "WBD", "DC": "WBD", "Max": "WBD",
-    "Universal": "CMCSA", "Comcast": "CMCSA", "DreamWorks": "CMCSA", "Focus": "CMCSA",
-    "Paramount": "PARA", "Netflix": "NFLX",
-    "Sony": "SONY", "Sony Pictures": "SONY", "Columbia": "SONY", "Crunchyroll": "SONY",
-    "Lionsgate": "LGF.A", "IMAX": "IMAX", "AMC": "AMC", "Cinemark": "CNK",
-    "Apple": "AAPL", "Amazon": "AMZN", "MGM": "AMZN",
-    "A24": "N/A", "Runway": "N/A", "Neon": "N/A",
-    "Adobe": "ADBE", "Nvidia": "NVDA",
-}
+TXT = "#E6EAF2"
+SUB = "#9DB0C8"

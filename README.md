@@ -1,35 +1,35 @@
-# Hollywood CardNews (web_search 버전)
+# CINEPARK0410 YouTube Factory - 구글 올인원
+# 5분 가로 + 1분20초 세로 동시 생성 공장
 
-할리우드 산업 뉴스 1건 → 5장 카드뉴스(1080x1920) 자동 생성 → 구글 드라이브 저장.
-사람은 드라이브에서 받아 업로드만 하면 됩니다.
+이 리포지토리는 기존 Naver 블로그용 AutoPost에서 **CINEPARK0410 유튜브 전용**으로 완전히 교체된 버전입니다.
 
-## 흐름
-1. Claude가 web_search로 최근 3일 내 산업 뉴스 조사 + 미국 증시 종가 조회 (STEP 1/2)
-2. HTML 카드 5장 생성 (블루블랙 #070A1A, Noto Sans CJK KR)
-3. Playwright로 PNG 캡처 + pngquant 최적화
-4. OAuth로 구글 드라이브 업로드
+## 특징
+- **주제 자동화**: 50개 주제어 중 AI가 스코어링해서 Top 1 선정 (사람은 주제 입력 안 함)
+- **하네스 깎기**: `config.py`의 CREDIBILITY_HARNESS가 모든 프롬프트에 강제 주입
+- **AI 서로 스코어링 QA**: Gemini 작가가 쓰면 Gemini 심사관이 100점 만점으로 채점, 85점 미만이면 자동 재생성
+- **신뢰도**: 모든 대본은 우리말샘 Open API 데이터를 1차 출처로만 사용, 영상에 `출처: 국립국어원 우리말샘` 고정 자막
+- **구글 올인원**: Gemini(대본) + Imagen(이미지) + Cloud TTS(음성) + Colab(조립) + Drive(저장) + YouTube 업로드
 
-## 비용 안전장치
-- 검색 횟수 상한: `MAX_SEARCHES`(기본 10). 1회=$0.01 → 실행당 검색비 최대 $0.10 확정.
-- 하루 1회 실행 기준 월 예상 약 $6 (원화 8천원대).
+## 출력
+- `output/YYYY-MM-DD_키워드_dual/`
+  - `script_5min.txt` - 5분 가로 대본 (300초, 5챕터)
+  - `script_80sec.txt` - 1분20초 세로 대본 (80초)
+  - `meta.json` - QA 점수, 우리말샘 원문, 시각 프롬프트 포함
+  - `final_horizontal.mp4` - Colab에서 생성된 1920x1080
+  - `final_vertical.mp4` - Colab에서 생성된 1080x1920
 
-## 로컬 실행
-1. `.env.example` → `.env` 복사 후 값 입력
-2. `pip install -r requirements.txt`
-3. `python -m playwright install chromium`
-4. `sudo apt-get install -y fonts-noto-cjk pngquant`
-5. `python main.py`
+## 필요 Secrets (기존 Secrets 그대로 사용)
+- `GEMINI_API_KEY` 또는 `GOOGLE_API_KEY` - Google AI Studio에서 발급
+- `OURIMALSAEM_API_KEY` - 03372... (이미 발급됨)
+- `GDRIVE_FOLDER_ID_OUTPUT` - 5분 가로 저장 폴더
+- `GDRIVE_FOLDER_ID_BACKGROUND` - 세로 배경 폴더
+- `GOOGLE_OAUTH_CLIENT_ID / SECRET / REFRESH_TOKEN` - 유튜브 업로드용
+
+## 실행
+```bash
+pip install -r requirements.txt
+python main.py
+```
 
 ## GitHub Actions
-- 매일 08:00 KST 자동 실행 (`.github/workflows/daily.yml`)
-- Secrets: ANTHROPIC_API_KEY, GDRIVE_FOLDER_ID_OUTPUT, GOOGLE_OAUTH_CLIENT_ID/SECRET/REFRESH_TOKEN
-
-## 카드 구조
-1. 표지: 라벨 + 헤드라인(핵심숫자 골드) + 서브 + 푸터
-2. 01 INDUSTRY NEWS: 핵심 뉴스 + (기사에 수치 있으면) 막대 비교
-3. 02 BY THE NUMBERS: 스탯 3개 (기사 명시 수치만)
-4. 03 WHY IT MATTERS: 소제목 + 본문
-5. 04 MARKET CLOSE: 현재가 + 등락 + 7거래일 차트 + 매핑규칙 + 출처
-
-## 수치 원칙
-기사 원문에 명시된 숫자만 사용. 없으면 해당 블록 미표시. 주가 확인 불가 시 "라이브 차트 확인 필요".
+매일 오전 7시 KST 자동 실행 - `.github/workflows/youtube.yml`
