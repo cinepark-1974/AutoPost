@@ -1,0 +1,43 @@
+name: CINEPARK0410 YouTube Factory - 5min + Shorts
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 22 * * *'  # KST 07:00
+
+jobs:
+  generate-youtube:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Generate 5min + Shorts (with QA)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OURIMALSAEM_API_KEY: ${{ secrets.OURIMALSAEM_API_KEY }}
+          GDRIVE_FOLDER_ID_OUTPUT: ${{ secrets.GDRIVE_FOLDER_ID_OUTPUT }}
+          GDRIVE_FOLDER_ID_BACKGROUND: ${{ secrets.GDRIVE_FOLDER_ID_BACKGROUND }}
+          GOOGLE_CREDENTIALS_JSON_CONTENT: ${{ secrets.GOOGLE_CREDENTIALS_JSON_CONTENT }}
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+          GOOGLE_OAUTH_REFRESH_TOKEN: ${{ secrets.GOOGLE_OAUTH_REFRESH_TOKEN }}
+        run: |
+          python main.py
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cinepark-youtube-dual
+          path: output/
